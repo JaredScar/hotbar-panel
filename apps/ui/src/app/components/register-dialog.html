@@ -1,0 +1,59 @@
+<div class="fixed inset-0 z-20 flex cursor-pointer items-start justify-center bg-black/60 px-4 py-16" (click)="closed.emit()">
+  <form
+    class="w-full max-w-lg cursor-auto rounded-md border border-line bg-surface p-5 shadow-xl"
+    (click)="$event.stopPropagation()"
+    (ngSubmit)="submit()"
+  >
+    <h2 class="text-lg font-semibold">New server</h2>
+    <p class="mt-1 text-sm text-faint">Register a program already on this machine. The agent starts it directly, with no shell.</p>
+
+    <label class="mt-4 block text-[11px] uppercase tracking-wide text-faint">
+      Name
+      <input name="name" required class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2 text-sm normal-case tracking-normal text-ink" [(ngModel)]="model.name" />
+    </label>
+    <label class="mt-3 block text-[11px] uppercase tracking-wide text-faint">
+      Executable
+      <input name="executable" required placeholder="node" class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2 text-sm normal-case tracking-normal text-ink" [(ngModel)]="model.executable" />
+    </label>
+    <label class="mt-3 block text-[11px] uppercase tracking-wide text-faint">
+      Arguments, one per line
+      <textarea name="args" rows="3" class="mt-1 w-full rounded border border-line bg-canvas px-2 py-1 font-mono text-sm normal-case tracking-normal text-ink" [(ngModel)]="model.args"></textarea>
+    </label>
+    <label class="mt-3 block text-[11px] uppercase tracking-wide text-faint">
+      Working directory
+      <input name="cwd" required class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2 text-sm normal-case tracking-normal text-ink" [(ngModel)]="model.cwd" />
+    </label>
+    <div class="mt-3 grid grid-cols-2 gap-3">
+      <label class="block text-[11px] uppercase tracking-wide text-faint">
+        Address
+        <input name="ip" class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2 text-sm normal-case tracking-normal text-ink" [(ngModel)]="model.ip" />
+      </label>
+      <label class="block text-[11px] uppercase tracking-wide text-faint">
+        Port
+        <input name="port" inputmode="numeric" class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2 text-sm normal-case tracking-normal text-ink" [(ngModel)]="model.port" />
+      </label>
+    </div>
+    <label class="mt-3 block text-[11px] uppercase tracking-wide text-faint">
+      Stop command sent to stdin
+      <input name="stop" placeholder="stop" class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2 text-sm normal-case tracking-normal text-ink" [(ngModel)]="model.stop" />
+    </label>
+
+    @if (error()) {
+      <p class="mt-3 text-sm text-danger">{{ error() }}</p>
+    }
+
+    <div class="mt-5 flex items-center justify-between gap-3">
+      @if (dev()) {
+        <button type="button" class="text-sm text-accent hover:underline" [disabled]="saving()" (click)="demo()">Add demo echo server</button>
+      } @else {
+        <span></span>
+      }
+      <div class="flex gap-2">
+        <button type="button" class="h-9 rounded px-3 text-sm text-faint hover:bg-raised" (click)="closed.emit()">Cancel</button>
+        <button type="submit" class="h-9 rounded bg-accent px-3 text-sm font-medium text-white disabled:opacity-50" [disabled]="saving()">
+          {{ saving() ? 'Creating…' : 'Create server' }}
+        </button>
+      </div>
+    </div>
+  </form>
+</div>

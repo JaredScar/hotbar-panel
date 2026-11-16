@@ -1,0 +1,64 @@
+<section class="mx-auto w-full max-w-2xl px-6 py-8">
+  <a routerLink="/panel" class="text-sm text-faint no-underline hover:text-ink">Back to panel</a>
+  <h1 class="mt-3 text-xl font-semibold">Account</h1>
+  @if (error()) {
+    <p class="mt-3 text-sm text-danger">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p class="mt-3 text-sm text-running">{{ message() }}</p>
+  }
+
+  <h2 class="mt-6 text-sm font-medium">Machines</h2>
+  <ul class="mt-2 text-sm">
+    @for (node of nodes(); track node.id) {
+      <li>{{ node.hostname }} · {{ node.os }}</li>
+    } @empty {
+      <li class="text-faint">No paired machines.</li>
+    }
+  </ul>
+
+  <h2 class="mt-6 text-sm font-medium">Passkey</h2>
+  <p class="mt-1 text-sm text-faint">Windows Hello, a phone, or a security key can sign in without the password.</p>
+  <button type="button" class="mt-2 h-8 rounded border border-line px-3 text-sm" (click)="addPasskey()">Add a passkey</button>
+  <ul class="mt-2 text-sm">
+    @for (passkey of passkeys(); track passkey.id) {
+      <li class="font-mono">{{ passkey.id }}</li>
+    }
+  </ul>
+
+  <h2 class="mt-6 text-sm font-medium">Authenticator</h2>
+  <p class="mt-1 text-sm text-faint">Adds a 6-digit code to password sign-in.</p>
+  <button type="button" class="mt-2 h-8 rounded border border-line px-3 text-sm" (click)="startTotp()">Set up authenticator</button>
+  @if (secret()) {
+    <p class="mt-2 font-mono text-sm">{{ secret() }}</p>
+    <input class="mt-2 h-9 w-40 rounded border border-line bg-canvas px-2" placeholder="123456" [value]="code()" (input)="code.set($any($event.target).value)" />
+    <button type="button" class="ml-2 h-9 rounded bg-accent px-3 text-sm text-white" (click)="confirmTotp()">Confirm</button>
+  }
+
+  <h2 class="mt-6 text-sm font-medium">API keys</h2>
+  <div class="mt-2 flex gap-2">
+    <input class="h-9 rounded border border-line bg-canvas px-2" [value]="keyName()" (input)="keyName.set($any($event.target).value)" />
+    <button type="button" class="h-9 rounded border border-line px-3 text-sm" (click)="makeKey()">Create key</button>
+  </div>
+  @if (newKey()) {
+    <p class="mt-2 font-mono text-sm break-all">{{ newKey() }}</p>
+    <p class="text-sm text-faint">Copy it now. Hotbar stores only a hash.</p>
+  }
+  <ul class="mt-2 text-sm">
+    @for (key of keys(); track key.id) {
+      <li>{{ key.name }}</li>
+    }
+  </ul>
+
+  <h2 class="mt-6 text-sm font-medium">Sub-user</h2>
+  <p class="mt-1 text-sm text-faint">The person needs an account already. They can start, stop, and use the console.</p>
+  <div class="mt-2 grid gap-2">
+    <select class="h-9 rounded border border-line bg-canvas px-2" [value]="serverId()" (change)="serverId.set($any($event.target).value)">
+      @for (server of servers(); track server.id) {
+        <option [value]="server.id">{{ server.name }}</option>
+      }
+    </select>
+    <input class="h-9 rounded border border-line bg-canvas px-2" placeholder="email" [value]="email()" (input)="email.set($any($event.target).value)" />
+    <button type="button" class="h-9 w-fit rounded bg-accent px-3 text-sm text-white" (click)="addUser()">Add</button>
+  </div>
+</section>

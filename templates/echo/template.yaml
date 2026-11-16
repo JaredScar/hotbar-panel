@@ -1,0 +1,9 @@
+id: echo
+version: 1
+group: utility
+name: Echo
+runtimes:
+  process: { os: [windows, linux] }
+startup:
+  command: ["node", "server.mjs"]
+stop: { stdin: stop, timeout_s: 5, then: kill }

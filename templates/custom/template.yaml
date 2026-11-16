@@ -1,0 +1,9 @@
+id: custom
+version: 1
+group: custom
+name: Custom
+runtimes:
+  process: { os: [windows, linux] }
+startup:
+  command: ["server"]
+stop: { stdin: "stop", timeout_s: 30, then: kill }

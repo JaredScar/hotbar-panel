@@ -1,0 +1,62 @@
+<section class="flex min-h-0 flex-1 flex-col">
+  <form class="mx-auto w-full max-w-2xl px-6 py-6" (submit)="save(); $event.preventDefault()">
+    <h1 class="text-xl font-semibold">server.properties</h1>
+    <p class="mt-1 text-sm text-faint">Restart the server to apply changes. Lines this form does not edit are left as they are. Stop the server before changing the port.</p>
+
+    <div class="mt-5 grid gap-3">
+      <label class="text-sm">
+        <span class="text-faint">Message of the day</span>
+        <input class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" maxlength="59" [value]="value('motd')" (input)="setValue('motd', $any($event.target).value)" />
+      </label>
+      <label class="text-sm">
+        <span class="text-faint">Port</span>
+        <input class="mt-1 h-9 w-40 rounded border border-line bg-canvas px-2" [value]="value('server-port')" (input)="setValue('server-port', $any($event.target).value)" />
+      </label>
+      <label class="text-sm">
+        <span class="text-faint">Gamemode</span>
+        <select class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" [value]="value('gamemode', 'survival')" (change)="setValue('gamemode', $any($event.target).value)">
+          <option value="survival">Survival</option>
+          <option value="creative">Creative</option>
+          <option value="adventure">Adventure</option>
+          <option value="spectator">Spectator</option>
+        </select>
+      </label>
+      <label class="text-sm">
+        <span class="text-faint">Difficulty</span>
+        <select class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" [value]="value('difficulty', 'easy')" (change)="setValue('difficulty', $any($event.target).value)">
+          <option value="peaceful">Peaceful</option>
+          <option value="easy">Easy</option>
+          <option value="normal">Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+      <label class="text-sm">
+        <span class="text-faint">Max players</span>
+        <input class="mt-1 h-9 w-32 rounded border border-line bg-canvas px-2" [value]="value('max-players')" (input)="setValue('max-players', $any($event.target).value)" />
+      </label>
+      <label class="text-sm">
+        <span class="text-faint">Seed</span>
+        <input class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" [value]="value('level-seed')" (input)="setValue('level-seed', $any($event.target).value)" />
+      </label>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" [checked]="value('white-list') === 'true'" (change)="setValue('white-list', $any($event.target).checked ? 'true' : 'false')" />
+        Whitelist
+      </label>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" [checked]="value('online-mode', 'true') !== 'false'" (change)="setValue('online-mode', $any($event.target).checked ? 'true' : 'false')" />
+        Online mode
+      </label>
+    </div>
+
+    @if (error()) {
+      <p class="mt-4 text-sm text-danger">{{ error() }}</p>
+    }
+    @if (saved()) {
+      <p class="mt-4 text-sm text-running">Saved. Restart the server to apply it.</p>
+    }
+
+    <button type="submit" class="mt-4 h-9 rounded bg-accent px-3 text-sm font-medium text-white disabled:opacity-40" [disabled]="busy()">
+      Save
+    </button>
+  </form>
+</section>

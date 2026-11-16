@@ -1,0 +1,393 @@
+<section class="mx-auto w-full max-w-4xl px-6 py-6">
+  <a [routerLink]="backLink" class="text-sm text-faint no-underline hover:text-ink">Back to servers</a>
+  <div class="mt-3 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold">Create a server</h1>
+      <p class="mt-1 text-sm text-faint">Four choices, then it downloads, installs, and starts. You do not type a command.</p>
+    </div>
+  </div>
+
+  @if (stage() !== 'install') {
+    <ol class="mt-5 flex flex-wrap items-center gap-1">
+      @for (step of steps(); track step.id; let i = $index) {
+        <li class="flex items-center gap-1">
+          @if (i > 0) {
+            <span class="mx-1 hidden h-px w-5 sm:block" [class.bg-accent]="stepIndex() > i" [class.bg-line]="stepIndex() <= i"></span>
+          }
+          <button
+            type="button"
+            class="flex items-center gap-2 rounded px-1.5 py-1 text-sm disabled:cursor-default"
+            [disabled]="i > stepIndex()"
+            [attr.aria-current]="i === stepIndex() ? 'step' : null"
+            (click)="goTo(step.id)"
+          >
+            <span
+              class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+              [class.bg-accent]="i === stepIndex()"
+              [class.text-white]="i === stepIndex()"
+              [class.bg-raised]="i < stepIndex()"
+              [class.text-ink]="i < stepIndex()"
+              [class.bg-surface]="i > stepIndex()"
+              [class.text-faint]="i > stepIndex()"
+            >
+              {{ i + 1 }}
+            </span>
+            <span class="hidden sm:inline" [class.text-ink]="i <= stepIndex()" [class.text-faint]="i > stepIndex()">{{ step.label }}</span>
+          </button>
+        </li>
+      }
+    </ol>
+
+    <div class="mt-5">
+      <h2 class="text-lg font-semibold">{{ stageTitle() }}</h2>
+    </div>
+  }
+
+  @if (stage() === 'game') {
+    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+      @for (item of games; track item.id) {
+        <button
+          type="button"
+          class="rounded-lg border px-4 py-4 text-left"
+          [class.border-accent]="game() === item.id"
+          [class.bg-raised]="game() === item.id"
+          [class.border-line]="game() !== item.id"
+          [class.bg-surface]="game() !== item.id"
+          (click)="pickGame(item.id)"
+        >
+          <span class="block text-base font-medium">{{ item.title }}</span>
+          <span class="mt-1 block text-sm text-faint">{{ item.detail }}</span>
+        </button>
+      }
+    </div>
+  }
+
+  @if (stage() === 'type') {
+    <div class="mt-4 grid gap-6">
+      @for (group of groups; track group.title) {
+        <section>
+          <h3 class="text-xs uppercase tracking-wide text-faint">{{ group.title }}</h3>
+          <div class="mt-2 grid gap-3 sm:grid-cols-2">
+            @for (item of group.items; track item.id) {
+              <button
+                type="button"
+                class="rounded-lg border px-4 py-3 text-left"
+                [class.border-accent]="providerChosen(item.id)"
+                [class.bg-raised]="providerChosen(item.id)"
+                [class.border-line]="!providerChosen(item.id)"
+                [class.bg-surface]="!providerChosen(item.id)"
+                (click)="pickProvider(item.id)"
+              >
+                <span class="flex items-center justify-between gap-2">
+                  <span class="text-base font-medium">{{ item.title }}</span>
+                  @if (isPaper(item.id)) {
+                    <span class="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">Recommended</span>
+                  }
+                </span>
+                <span class="mt-1 block text-sm text-faint">{{ item.detail }}</span>
+              </button>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  }
+
+  @if (stage() === 'version') {
+    @if (game() !== 'fivem') {
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+      @if (game() === 'minecraft') {
+        <label class="flex items-center gap-2 text-sm text-faint">
+          <input type="checkbox" [checked]="snapshots()" (change)="snapshots.set(!snapshots()); loadVersions()" />
+          Show snapshots and release candidates
+        </label>
+        <label class="block min-w-56 flex-1 text-sm sm:max-w-xs">
+          <span class="sr-only">Find a version</span>
+          <input
+            class="h-9 w-full rounded border border-line bg-canvas px-2"
+            type="search"
+            placeholder="Find a version"
+            [value]="versionQuery()"
+            (input)="versionQuery.set($any($event.target).value)"
+          />
+        </label>
+      } @else if (game() === 'hytale') {
+        <label class="flex items-center gap-2 text-sm text-faint">
+          <input type="checkbox" [checked]="snapshots()" (change)="snapshots.set(!snapshots()); loadVersions()" />
+          Include the pre-release channel
+        </label>
+      }
+    </div>
+    }
+
+    @if (showSpigotNote()) {
+      <p class="mt-3 rounded-lg border border-starting/40 bg-starting/10 px-3 py-2 text-sm text-ink">
+        Spigot is compiled on this machine and the first install can take several minutes. Git has to be installed. Paper downloads a ready-made jar.
+      </p>
+    }
+
+    @if (loadingVersions()) {
+      <p class="mt-4 text-sm text-faint">Loading versions…</p>
+    } @else if (versionError()) {
+      <div class="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-3 text-sm text-danger">
+        <p>{{ versionError() }}</p>
+        <button type="button" class="mt-2 h-8 rounded border border-danger/40 px-2 text-ink" (click)="loadVersions()">Try again</button>
+      </div>
+    } @else if (game() === 'minecraft') {
+      <div class="mt-3 max-h-80 overflow-auto rounded-lg border border-line">
+        @if (visibleVersions().length === 0) {
+          <p class="px-3 py-6 text-sm text-faint">No versions match that search.</p>
+        }
+        @for (item of visibleVersions(); track item.id; let first = $first) {
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-3 border-b border-l-2 border-line px-3 py-2.5 text-left last:border-b-0"
+            [class.border-l-accent]="version() === item.id"
+            [class.bg-raised]="version() === item.id"
+            [class.border-l-transparent]="version() !== item.id"
+            [class.bg-surface]="version() !== item.id"
+            (click)="version.set(item.id)"
+          >
+            <span class="font-mono text-sm">{{ item.id }}</span>
+            <span class="flex items-center gap-2 text-xs">
+              @if (first && !versionQuery() && item.stable) {
+                <span class="rounded-full bg-accent/15 px-2 py-0.5 font-medium text-accent">Latest</span>
+              }
+              @if (!item.stable) {
+                <span class="text-faint">Unstable</span>
+              }
+            </span>
+          </button>
+        }
+      </div>
+      <p class="mt-2 text-xs text-faint">{{ visibleVersions().length }} of {{ versions().length }} versions. Newest is at the top.</p>
+    } @else {
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        @for (item of versions(); track item.id) {
+          <button
+            type="button"
+            class="rounded-lg border px-4 py-3 text-left"
+            [class.border-accent]="version() === item.id"
+            [class.bg-raised]="version() === item.id"
+            [class.border-line]="version() !== item.id"
+            [class.bg-surface]="version() !== item.id"
+            (click)="version.set(item.id)"
+          >
+            <span class="block text-base font-medium">{{ versionTitle(item.id) }}</span>
+            <span class="mt-1 block text-sm text-faint">
+              {{ item.id === 'recommended' || item.id === 'release' ? 'The channel to run for other people.' : 'Newer, and it changes more often.' }}
+            </span>
+          </button>
+        }
+      </div>
+    }
+  }
+
+  @if (stage() === 'size') {
+    @if (freeLabel()) {
+      <p class="mt-2 text-sm text-faint">This machine has {{ freeLabel() }} of memory free.</p>
+    }
+    <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      @for (item of sizes; track item.id) {
+        <button
+          type="button"
+          class="rounded-lg border px-4 py-4 text-left"
+          [class.border-accent]="size() === item.id"
+          [class.bg-raised]="size() === item.id"
+          [class.border-line]="size() !== item.id"
+          [class.bg-surface]="size() !== item.id"
+          (click)="size.set(item.id)"
+        >
+          <span class="block text-base font-medium">{{ item.label }}</span>
+          <span class="mt-2 block text-2xl font-semibold tracking-tight">
+            {{ item.id === 'custom' ? 'Set' : formatGb(item.memoryMb) }}
+          </span>
+          <span class="mt-1 block text-sm text-faint">~{{ sizePlayers(item.id) }} players · {{ item.detail }}</span>
+        </button>
+      }
+    </div>
+    @if (needsMoreMemory()) {
+      <p class="mt-3 text-sm text-faint">Mods and Hytale start one step above a small world, so a small choice moves up to medium.</p>
+    }
+    @if (lowMemory()) {
+      <p class="mt-3 rounded-lg border border-starting/40 bg-starting/10 px-3 py-2 text-sm">
+        {{ formatGb(memoryMb()) }} is more than the {{ freeLabel() }} free on this machine. It can still start, and the rest of the system will be tight.
+      </p>
+    }
+    @if (size() === 'custom') {
+      <label class="mt-4 block max-w-xs text-sm">
+        <span class="text-faint">Memory (MB)</span>
+        <input
+          class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2"
+          type="number"
+          min="512"
+          max="32768"
+          step="256"
+          [value]="customMb()"
+          (input)="customMb.set(+$any($event.target).value)"
+        />
+        <span class="mt-1 block text-xs text-faint">512 MB to 32 GB.</span>
+      </label>
+    }
+  }
+
+  @if (stage() === 'details') {
+    <div class="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div class="grid gap-3">
+        <label class="block text-sm">
+          <span class="text-faint">Name</span>
+          <input class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" [value]="name()" (input)="name.set($any($event.target).value)" />
+        </label>
+
+        @if (game() === 'fivem') {
+          <label class="block text-sm">
+            <span class="text-faint">Cfx.re license key</span>
+            <input
+              class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2 font-mono"
+              autocomplete="off"
+              spellcheck="false"
+              [value]="licenseKey()"
+              (input)="licenseKey.set($any($event.target).value)"
+            />
+          </label>
+          <p class="text-sm text-faint">
+            The key comes from the Cfx portal. It is stored for this server and kept out of the console log. The server listens on the next free port from 30120.
+          </p>
+        }
+
+        @if (game() === 'minecraft') {
+          <label class="block text-sm">
+            <span class="text-faint">Message of the day</span>
+            <input class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" maxlength="59" [value]="motd()" (input)="motd.set($any($event.target).value)" />
+          </label>
+          <label class="flex items-start gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-sm">
+            <input class="mt-0.5" type="checkbox" [checked]="eula()" (change)="eula.set(!eula())" />
+            <span>
+              I agree to the
+              <a class="text-accent" href="https://aka.ms/MinecraftEULA" target="_blank" rel="noreferrer">Minecraft EULA</a>
+            </span>
+          </label>
+          <details class="rounded-lg border border-line bg-surface px-4 py-3 text-sm">
+            <summary class="cursor-pointer text-faint">More options</summary>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+              <label>
+                <span class="text-faint">Gamemode</span>
+                <select class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" [value]="gamemode()" (change)="gamemode.set($any($event.target).value)">
+                  <option value="survival">Survival</option>
+                  <option value="creative">Creative</option>
+                  <option value="adventure">Adventure</option>
+                  <option value="spectator">Spectator</option>
+                </select>
+              </label>
+              <label>
+                <span class="text-faint">Difficulty</span>
+                <select class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" [value]="difficulty()" (change)="difficulty.set($any($event.target).value)">
+                  <option value="peaceful">Peaceful</option>
+                  <option value="easy">Easy</option>
+                  <option value="normal">Normal</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <label class="sm:col-span-2">
+                <span class="text-faint">Seed</span>
+                <input class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" [value]="seed()" (input)="seed.set($any($event.target).value)" />
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [checked]="whitelist()" (change)="whitelist.set(!whitelist())" />
+                Whitelist
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [checked]="onlineMode()" (change)="onlineMode.set(!onlineMode())" />
+                Online mode
+              </label>
+            </div>
+          </details>
+        }
+
+        @if (game() === 'hytale') {
+          <p class="text-sm text-faint">
+            The installer prints a sign-in link and code. Approve it in the browser and the download continues. Players connect over UDP.
+          </p>
+          <label class="flex items-start gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-sm">
+            <input class="mt-0.5" type="checkbox" [checked]="eula()" (change)="eula.set(!eula())" />
+            <span>I have a Hytale account and will sign in when the code appears</span>
+          </label>
+        }
+      </div>
+
+      <aside class="rounded-lg border border-line bg-surface px-4 py-3 text-sm">
+        <h3 class="text-xs uppercase tracking-wide text-faint">This server</h3>
+        <dl class="mt-3 grid gap-2">
+          <div class="flex justify-between gap-3">
+            <dt class="text-faint">Game</dt>
+            <dd>{{ gameTitle() }}</dd>
+          </div>
+          @if (game() === 'minecraft') {
+            <div class="flex justify-between gap-3">
+              <dt class="text-faint">Type</dt>
+              <dd>{{ providerTitle(provider()) }}</dd>
+            </div>
+          }
+          <div class="flex justify-between gap-3">
+            <dt class="text-faint">{{ game() === 'minecraft' ? 'Version' : 'Channel' }}</dt>
+            <dd class="font-mono">{{ versionTitle(version()) }}</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-faint">Size</dt>
+            <dd>{{ formatGb(memoryMb()) }} · {{ players() }}</dd>
+          </div>
+        </dl>
+        <p class="mt-3 break-all font-mono text-xs text-faint">{{ serversRoot() || 'The servers folder' }}</p>
+      </aside>
+    </div>
+  }
+
+  @if (stage() !== 'install') {
+    @if (error()) {
+      <p class="mt-3 text-sm text-danger">{{ error() }}</p>
+    }
+    <div class="mt-6 flex items-center justify-between border-t border-line pt-4">
+      @if (stage() === 'game') {
+        <span></span>
+      } @else {
+        <button type="button" class="h-9 rounded px-3 text-sm text-faint hover:bg-surface hover:text-ink" (click)="back()">Back</button>
+      }
+      <button
+        type="button"
+        class="h-9 min-w-36 rounded bg-accent px-4 text-sm font-medium text-white disabled:opacity-40"
+        [disabled]="!canAdvance()"
+        (click)="advance()"
+      >
+        {{ advanceLabel() }}
+      </button>
+    </div>
+  }
+
+  @if (stage() === 'install') {
+    <div class="mt-5">
+      <h2 class="text-lg font-semibold">{{ installing() ? 'Installing' : 'Install stopped' }} {{ name() }}</h2>
+      <p class="mt-1 text-sm text-faint">
+        {{ gameTitle() }}
+        @if (game() === 'minecraft') {
+          · {{ providerTitle(provider()) }}
+        }
+        · {{ versionTitle(version()) }} · {{ formatGb(memoryMb()) }}
+      </p>
+    </div>
+    <div #logBox class="mt-4 max-h-80 overflow-auto rounded-lg bg-bar p-3 font-mono text-sm">
+      @for (line of log(); track $index) {
+        <p class="break-all">{{ line }}</p>
+      }
+      @if (log().length === 0) {
+        <p class="text-faint">Waiting for the installer…</p>
+      }
+    </div>
+    @if (error()) {
+      <p class="mt-3 text-sm text-danger">{{ error() }}</p>
+      <button type="button" class="mt-3 h-9 rounded px-3 text-sm text-faint hover:bg-surface hover:text-ink" (click)="stage.set('details')">Back to setup</button>
+    }
+  }
+</section>
+@if (promptItems(); as items) {
+  <app-download-prompt [items]="items" (agreed)="agreeDownload()" (cancelled)="cancelDownload()" />
+}

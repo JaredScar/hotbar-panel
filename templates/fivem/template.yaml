@@ -1,0 +1,23 @@
+id: fivem
+version: 1
+group: gta
+name: FiveM
+runtimes:
+  docker: { image: "hotbar/fxserver:latest" }
+  process: { os: [windows, linux] }
+variables:
+  - { key: LICENSE_KEY, label: "Cfx.re license key", secret: true, required: true }
+  - { key: MAX_PLAYERS, label: "Max players", type: int, default: 48 }
+ports:
+  - { name: game, default: 30120, protocols: [tcp, udp] }
+install:
+  - { step: download-fxserver-artifact, channel: recommended }
+  - { step: write-file, path: server.cfg, from: templates/server.cfg.hbs }
+startup:
+  command: ["FXServer", "+exec", "server.cfg", "+set", "sv_licenseKey", "${LICENSE_KEY}"]
+  ready_when: { log_matches: "server license key authentication succeeded" }
+stop: { stdin: "quit", timeout_s: 30, then: kill }
+config_files:
+  - { path: server.cfg, parser: fivem-cfg, managed_blocks: [resources] }
+query: { type: fivem-http, path: /players.json }
+ui_plugins: [fivem-resources]

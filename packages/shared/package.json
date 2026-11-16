@@ -1,0 +1,28 @@
+{
+  "name": "@hotbar/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node/paths.d.ts",
+      "default": "./dist/node/paths.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.17.0",
+    "typescript": "~5.9.2"
+  }
+}

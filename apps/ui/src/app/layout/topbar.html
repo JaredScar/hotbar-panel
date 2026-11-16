@@ -1,0 +1,41 @@
+<header class="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-bar px-4">
+  <a routerLink="/" class="flex items-center gap-2.5 text-ink no-underline">
+    <img src="brand-logo.png" alt="" class="h-8 w-auto" />
+    <span class="text-base font-semibold tracking-tight">Hotbar</span>
+  </a>
+
+  <div class="ml-auto flex items-center gap-2">
+    @if (search.open()) {
+      <input
+        #searchInput
+        type="search"
+        class="h-8 w-56 rounded border border-line bg-canvas px-2 text-sm text-ink placeholder:text-faint"
+        placeholder="Search servers"
+        [value]="search.query()"
+        (input)="onQuery($event)"
+        (keydown.escape)="closeSearch()"
+      />
+    } @else {
+      <button type="button" class="h-8 rounded px-2 text-sm text-faint hover:bg-surface hover:text-ink" (click)="openSearch()">
+        Search
+      </button>
+    }
+    <a
+      routerLink="/panel"
+      routerLinkActive="bg-surface text-ink"
+      class="h-8 rounded px-2 text-sm leading-8 text-faint no-underline hover:bg-surface hover:text-ink"
+    >
+      Panel
+    </a>
+    <a
+      routerLink="/machine"
+      routerLinkActive="bg-surface text-ink"
+      class="h-8 rounded px-2 text-sm leading-8 text-faint no-underline hover:bg-surface hover:text-ink"
+    >
+      This machine
+    </a>
+    <span class="rounded-full border border-line px-2 py-0.5 text-[11px] uppercase tracking-wide text-faint">
+      {{ data.connected() ? (data.linkedPanel() ? 'Linked' : 'Local only') : 'Agent offline' }}
+    </span>
+  </div>
+</header>

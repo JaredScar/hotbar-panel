@@ -1,0 +1,15 @@
+id: palworld
+version: 1
+group: steam
+name: Palworld
+variables: []
+startup:
+  command:
+    - PalServer
+stop:
+  stdin: stop
+  timeout_s: 30
+  then: kill
+install:
+  - step: steamcmd
+    app_id: "2394010"

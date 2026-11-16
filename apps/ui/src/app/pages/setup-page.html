@@ -1,0 +1,26 @@
+<section class="mx-auto w-full max-w-2xl px-6 py-8">
+  <a routerLink="/" class="text-sm text-faint no-underline hover:text-ink">Back</a>
+  <h1 class="mt-3 text-xl font-semibold">Set up this machine</h1>
+  <p class="mt-1 text-sm text-faint">Hotbar keeps game servers in one folder and starts them from the agent. Closing the window does not stop them.</p>
+
+  @if (error()) {
+    <p class="mt-4 text-sm text-danger">{{ error() }}</p>
+  }
+  @if (status(); as info) {
+    <dl class="mt-5 space-y-3 text-sm">
+      <div>
+        <dt class="text-[11px] uppercase tracking-wide text-faint">Servers folder</dt>
+        <dd class="font-mono">{{ info.serversRoot }}</dd>
+      </div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wide text-faint">Docker</dt>
+        <dd>{{ info.docker ? 'Found on PATH. Imported eggs can use it.' : 'Not found. Minecraft, FiveM, and Hytale use the process runtime.' }}</dd>
+      </div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wide text-faint">SteamCMD</dt>
+        <dd>{{ info.steamcmd ? 'Found on PATH.' : 'Not found. Palworld and Rust installs need SteamCMD on PATH.' }}</dd>
+      </div>
+    </dl>
+    <button type="button" class="mt-6 h-9 rounded bg-accent px-3 text-sm font-medium text-white" (click)="finish()">Continue to create a server</button>
+  }
+</section>

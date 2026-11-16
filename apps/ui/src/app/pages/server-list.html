@@ -1,0 +1,92 @@
+<section class="mx-auto w-full max-w-6xl px-6 py-6">
+  <div class="mb-4 flex items-center justify-between gap-3">
+    <h1 class="text-xl font-semibold">Servers</h1>
+    <div class="flex gap-2">
+      @if (data.remote()) {
+        <a
+          routerLink="/create"
+          [queryParams]="{ return: 'panel' }"
+          class="inline-flex h-9 items-center rounded bg-accent px-3 text-sm font-medium text-white no-underline"
+        >
+          Create server
+        </a>
+        <button type="button" class="h-9 rounded border border-line px-3 text-sm" (click)="pair()">Pair a machine</button>
+        <a routerLink="/panel/account" class="inline-flex h-9 items-center rounded border border-line px-3 text-sm no-underline">Account</a>
+        <button type="button" class="h-9 rounded px-3 text-sm text-faint" (click)="signOut()">Sign out</button>
+      } @else {
+        <a routerLink="/setup" class="inline-flex h-9 items-center rounded border border-line px-3 text-sm no-underline">Setup</a>
+        <a routerLink="/create" class="inline-flex h-9 items-center rounded bg-accent px-3 text-sm font-medium text-white no-underline">
+          Create server
+        </a>
+        <button type="button" class="h-9 rounded border border-line px-3 text-sm" (click)="creating.set(true)">New server</button>
+      }
+    </div>
+  </div>
+
+  @if (pairingCode()) {
+    <p class="mb-4 rounded border border-line bg-surface px-3 py-2 text-sm">
+      On the host, open This machine and enter this code. It works once, for 10 minutes:
+      <span class="ml-1 font-mono text-base text-ink">{{ pairingCode() }}</span>
+    </p>
+  }
+
+  @if (data.connectionError(); as message) {
+    <p class="mb-4 rounded border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{{ message }}</p>
+  }
+
+  @if (filtered().length === 0) {
+    <div class="rounded border border-dashed border-line px-6 py-16 text-center">
+      <p class="text-base text-ink">{{ search.query() ? 'No servers match that search.' : 'No servers yet' }}</p>
+      <p class="mt-1 text-sm text-faint">
+        {{
+          data.remote()
+            ? 'Create a server on the linked machine. It appears here when the install starts.'
+            : 'Create a Minecraft, FiveM, or Hytale server, or register a program that is already on this computer.'
+        }}
+      </p>
+      @if (!search.query()) {
+        <div class="mt-4 flex justify-center gap-2">
+          <a
+            routerLink="/create"
+            [queryParams]="data.remote() ? { return: 'panel' } : null"
+            class="inline-flex h-9 items-center rounded bg-accent px-3 text-sm font-medium text-white no-underline"
+          >
+            Create a server
+          </a>
+          @if (!data.remote()) {
+            <button type="button" class="h-9 rounded border border-line px-3 text-sm" (click)="creating.set(true)">Register a program</button>
+          }
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="mb-2 grid grid-cols-[1.4fr_1fr_0.6fr_1fr_0.7fr] gap-3 px-4 text-[11px] uppercase tracking-wide text-faint">
+      <span>Server</span>
+      <span>Address</span>
+      <span>CPU</span>
+      <span>Memory</span>
+      <span>Disk</span>
+    </div>
+    @for (server of filtered(); track server.id) {
+      <a
+        class="mb-2 grid grid-cols-[1.4fr_1fr_0.6fr_1fr_0.7fr] items-center gap-3 overflow-hidden rounded bg-surface no-underline hover:bg-raised"
+        [routerLink]="data.remote() ? ['server', server.id] : ['/server', server.id]"
+      >
+        <span class="flex min-w-0 items-center gap-3 border-l-4 py-3 pl-3" [style.border-color]="statusColor(server.state)">
+          <span class="min-w-0">
+            <span class="block truncate font-medium text-ink">{{ server.name }}</span>
+            <span class="block text-xs text-faint">{{ statusLabel(server.state) }} · This machine · process</span>
+          </span>
+        </span>
+        <span class="truncate font-mono text-sm text-ink">{{ address(server) }}</span>
+        <span class="text-sm text-ink">{{ formatPercent(server.stats?.cpuPercent) }}</span>
+        <span class="text-sm text-ink">{{ memoryLabel(server) }}</span>
+        <span class="pr-4 text-sm text-ink">{{ formatBytes(server.stats?.diskBytes ?? 0) }}</span>
+      </a>
+    }
+  }
+</section>
+
+@if (creating()) {
+  <app-register-dialog [dev]="data.dev()" (closed)="creating.set(false)" (created)="creating.set(false)" />
+}

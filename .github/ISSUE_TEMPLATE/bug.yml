@@ -1,0 +1,26 @@
+name: Bug
+description: Something Hotbar does that it should not
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Version
+      placeholder: 0.1.0
+  - type: dropdown
+    attributes:
+      label: Component
+      options:
+        - agent
+        - desktop
+        - ui
+        - panel

@@ -1,0 +1,29 @@
+{
+  "name": "@hotbar/panel-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node --experimental-sqlite dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "tsc -p tsconfig.json",
+    "test": "node --experimental-sqlite --test test/panel.test.mjs"
+  },
+  "dependencies": {
+    "@hotbar/shared": "workspace:*",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@simplewebauthn/server": "^14.1.0",
+    "hash-wasm": "^4.12.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.17.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "~5.9.2"
+  }
+}

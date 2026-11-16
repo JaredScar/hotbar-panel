@@ -1,0 +1,18 @@
+{
+  "name": "hotbar",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Open-source multi-game server panel. Desktop app, local agent, and optional online panel.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "typecheck": "pnpm --filter @hotbar/shared build && pnpm -r typecheck",
+    "lint": "pnpm typecheck",
+    "test": "pnpm --filter @hotbar/shared test && pnpm --filter @hotbar/agent test && pnpm --filter @hotbar/panel-api test && pnpm --filter @hotbar/desktop test && pnpm --filter @hotbar/ui test",
+    "build": "pnpm -r build"
+  }
+}

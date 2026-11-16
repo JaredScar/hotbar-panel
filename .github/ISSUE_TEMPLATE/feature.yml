@@ -1,0 +1,13 @@
+name: Feature
+description: A change that fits the current milestone
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes:
+      label: What should Hotbar do
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Milestone
+      placeholder: M1

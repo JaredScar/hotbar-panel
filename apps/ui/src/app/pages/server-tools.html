@@ -1,0 +1,245 @@
+<section class="min-h-0 flex-1 overflow-auto px-6 py-5">
+  @if (error()) {
+    <p class="mb-3 text-sm text-danger">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="mb-3 text-sm text-faint">{{ notice() }}</p>
+  }
+
+  @switch (tool()) {
+    @case ('files') {
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="up()" [disabled]="!folder()">Up</button>
+        <span class="font-mono text-sm text-faint">/{{ folder() }}</span>
+        <input class="h-8 rounded border border-line bg-canvas px-2 text-sm" placeholder="New folder" [value]="folderName()" (input)="folderName.set($any($event.target).value)" />
+        <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="createFolder()">Create</button>
+        <label class="h-8 cursor-pointer rounded border border-line px-2 text-sm leading-8">
+          Upload
+          <input class="hidden" type="file" (change)="onUpload($event)" />
+        </label>
+      </div>
+      <ul class="divide-y divide-line rounded border border-line">
+        @for (entry of files(); track entry.path) {
+          <li class="flex items-center gap-3 px-3 py-2 text-sm">
+            <button type="button" class="flex-1 text-left" (click)="openEntry(entry)">{{ entry.directory ? '📁' : '📄' }} {{ entry.name }}</button>
+            <span class="text-faint">{{ entry.directory ? '' : formatBytes(entry.size) }}</span>
+            <button type="button" class="text-danger" (click)="remove(entry)">Delete</button>
+          </li>
+        } @empty {
+          <li class="px-3 py-4 text-sm text-faint">This folder is empty.</li>
+        }
+      </ul>
+      @if (content(); as file) {
+        <div class="mt-4">
+          <h2 class="text-sm font-medium">{{ file.path }}</h2>
+          @if (file.binary) {
+            <p class="mt-2 text-sm text-faint">This file is binary ({{ formatBytes(file.size) }}). Upload a replacement instead of editing it here.</p>
+          } @else {
+            <textarea class="mt-2 h-64 w-full rounded border border-line bg-canvas p-2 font-mono text-sm" [value]="draft()" (input)="draft.set($any($event.target).value)"></textarea>
+            <button type="button" class="mt-2 h-8 rounded bg-accent px-3 text-sm text-white" [disabled]="busy()" (click)="saveText()">Save</button>
+          }
+        </div>
+      }
+    }
+    @case ('backups') {
+      <button type="button" class="h-9 rounded bg-accent px-3 text-sm text-white" [disabled]="busy()" (click)="backupNow()">Back up now</button>
+      <p class="mt-2 text-sm text-faint">Hotbar keeps the newest 7 backups. Restore only works while the server is stopped.</p>
+      <ul class="mt-4 divide-y divide-line rounded border border-line">
+        @for (backup of backups(); track backup.name) {
+          <li class="flex items-center gap-3 px-3 py-2 text-sm">
+            <span class="flex-1 font-mono">{{ backup.name }}</span>
+            <span class="text-faint">{{ formatBytes(backup.size) }}</span>
+            <button type="button" (click)="restore(backup.name)">Restore</button>
+            <button type="button" class="text-danger" (click)="removeBackup(backup.name)">Delete</button>
+          </li>
+        } @empty {
+          <li class="px-3 py-4 text-sm text-faint">No backups yet.</li>
+        }
+      </ul>
+    }
+    @case ('schedules') {
+      <form class="grid max-w-lg gap-2" (submit)="addSchedule($event)">
+        <input class="h-9 rounded border border-line bg-canvas px-2" [value]="scheduleName()" (input)="scheduleName.set($any($event.target).value)" />
+        <input class="h-9 rounded border border-line bg-canvas px-2 font-mono" [value]="cron()" (input)="cron.set($any($event.target).value)" placeholder="0 4 * * *" />
+        <select class="h-9 rounded border border-line bg-canvas px-2" [value]="task()" (change)="task.set($any($event.target).value)">
+          <option value="backup">Backup</option>
+          <option value="power">Power</option>
+          <option value="command">Command</option>
+        </select>
+        <input class="h-9 rounded border border-line bg-canvas px-2" [value]="payload()" (input)="payload.set($any($event.target).value)" placeholder="start, stop, restart, or a console command" />
+        <button type="submit" class="h-9 w-fit rounded bg-accent px-3 text-sm text-white">Add schedule</button>
+      </form>
+      <ul class="mt-4 divide-y divide-line rounded border border-line">
+        @for (row of schedules(); track row.id) {
+          <li class="flex items-center gap-3 px-3 py-2 text-sm">
+            <span class="flex-1">{{ row.name }} · {{ row.task }} · <span class="font-mono">{{ row.cron }}</span></span>
+            <button type="button" class="text-danger" (click)="removeSchedule(row.id)">Delete</button>
+          </li>
+        } @empty {
+          <li class="px-3 py-4 text-sm text-faint">No schedules.</li>
+        }
+      </ul>
+    }
+    @case ('network') {
+      @if (server(); as current) {
+        <p class="text-lg">{{ address(current) }}</p>
+        <p class="mt-3 text-sm text-faint">SFTP listens on this computer only. The username is the server id.</p>
+        @if (sftp(); as info) {
+          <p class="mt-2 font-mono text-sm">sftp://{{ info.username }}@{{ info.host }}:{{ info.port }}</p>
+          <p class="font-mono text-sm">password {{ info.password }}</p>
+        }
+      }
+    }
+    @case ('startup') {
+      @if (server(); as current) {
+        <p class="font-mono text-sm break-all">{{ startup(current) }}</p>
+        <p class="mt-3 text-sm text-faint">Working directory {{ current.cwd }}</p>
+        <p class="mt-1 text-sm text-faint">Stop command {{ current.stop.stdin || 'kill' }}, timeout {{ current.stop.timeoutMs / 1000 }}s</p>
+      }
+    }
+    @case ('activity') {
+      <ul class="divide-y divide-line rounded border border-line">
+        @for (row of activityRows(); track row.id) {
+          <li class="px-3 py-2 text-sm">
+            <span class="text-faint">{{ row.at }}</span> {{ row.event }}
+          </li>
+        } @empty {
+          <li class="px-3 py-4 text-sm text-faint">No activity yet.</li>
+        }
+      </ul>
+    }
+    @case ('players') {
+      <p class="text-sm text-faint">These commands go to the server console. The server has to be running.</p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="send('list')">list</button>
+        <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="send('whitelist on')">whitelist on</button>
+        <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="send('whitelist off')">whitelist off</button>
+      </div>
+      <form class="mt-3 flex gap-2" (submit)="send(command()); $event.preventDefault()">
+        <input class="h-9 flex-1 rounded border border-line bg-canvas px-2 font-mono text-sm" [value]="command()" (input)="command.set($any($event.target).value)" />
+        <button type="submit" class="h-9 rounded bg-accent px-3 text-sm text-white">Send</button>
+      </form>
+    }
+    @case ('plugins') {
+      <div class="mb-3 flex gap-2">
+        <input class="h-9 flex-1 rounded border border-line bg-canvas px-2" placeholder="Search Modrinth modpacks" [value]="query()" (input)="query.set($any($event.target).value)" />
+        <button type="button" class="h-9 rounded border border-line px-3 text-sm" [disabled]="busy()" (click)="findPacks()">Search</button>
+      </div>
+      <ul class="mb-4 divide-y divide-line rounded border border-line">
+        @for (pack of packs(); track pack.projectId) {
+          <li class="flex items-center gap-3 px-3 py-2 text-sm">
+            <span class="flex-1"><strong>{{ pack.title }}</strong><br /><span class="text-faint">{{ pack.description }}</span></span>
+            <button type="button" class="text-accent" [disabled]="busy()" (click)="installPack(pack.projectId)">Install</button>
+          </li>
+        }
+      </ul>
+      <p class="mb-2 text-sm text-faint">Files in the plugins folder. Disable renames a jar to .disabled. Stop the server before installing a pack.</p>
+      <ul class="divide-y divide-line rounded border border-line">
+        @for (entry of files(); track entry.path) {
+          <li class="flex items-center gap-3 px-3 py-2 text-sm">
+            <span class="flex-1">{{ entry.name }}</span>
+            @if (!entry.directory) {
+              <button type="button" (click)="togglePlugin(entry)">{{ entry.name.endsWith('.disabled') ? 'Enable' : 'Disable' }}</button>
+            }
+          </li>
+        } @empty {
+          <li class="px-3 py-4 text-sm text-faint">No plugins folder yet.</li>
+        }
+      </ul>
+    }
+    @case ('world') {
+      <p class="mb-2 text-sm text-faint">Reset takes a backup, then deletes the world folder. The server has to be stopped.</p>
+      <button type="button" class="mb-3 h-8 rounded border border-line px-3 text-sm" [disabled]="busy()" (click)="resetWorld()">Back up and reset world</button>
+      <ul class="divide-y divide-line rounded border border-line">
+        @for (entry of files(); track entry.path) {
+          <li class="px-3 py-2 text-sm">{{ entry.name }}</li>
+        } @empty {
+          <li class="px-3 py-4 text-sm text-faint">No world folder yet.</li>
+        }
+      </ul>
+    }
+    @case ('resources') {
+      <p class="text-sm text-faint">Drag is the up and down buttons. Save, then restart the server.</p>
+      <ul class="mt-3 divide-y divide-line rounded border border-line">
+        @for (name of ensureNames(); track name; let index = $index) {
+          <li class="flex items-center gap-2 px-3 py-2 text-sm"
+            draggable="true"
+            (dragstart)="moveEnsure(index, 0)"
+            (dragover)="$event.preventDefault()"
+            (drop)="moveEnsure(index, index === 0 ? 1 : -1)">
+            <span class="flex-1 font-mono">ensure {{ name }}</span>
+            <button type="button" (click)="moveEnsure(index, -1)">Up</button>
+            <button type="button" (click)="moveEnsure(index, 1)">Down</button>
+          </li>
+        } @empty {
+          <li class="px-3 py-3 text-sm text-faint">No ensure lines yet.</li>
+        }
+      </ul>
+      <textarea class="mt-3 h-48 w-full rounded border border-line bg-canvas p-2 font-mono text-sm" [value]="draft()" (input)="draft.set($any($event.target).value)"></textarea>
+      <button type="button" class="mt-2 h-8 rounded bg-accent px-3 text-sm text-white" [disabled]="busy()" (click)="saveText()">Save server.cfg</button>
+    }
+    @case ('users') {
+      <p class="max-w-xl text-sm text-faint">Sub-users are accounts on the online panel. Add them from the panel account page after the other person has registered. The machine owner keeps full access.</p>
+      <a routerLink="/panel/account" class="mt-3 inline-block text-sm text-accent">Open account</a>
+    }
+    @case ('version') {
+      @if (installed(); as current) {
+        <p>This server is {{ current.provider }} {{ current.version }}, Java {{ current.javaMajor }}.</p>
+      } @else {
+        <p class="text-sm text-faint">No Minecraft install is recorded for this server.</p>
+      }
+      <form class="mt-4 grid max-w-md gap-2" (submit)="applyVersion($event)">
+        <p class="text-sm text-faint">Changing the version writes a backup first, then installs into this folder. Stop the server before you continue. A downgrade can break the world.</p>
+        <select class="h-9 rounded border border-line bg-canvas px-2" [value]="nextProvider()" (change)="nextProvider.set($any($event.target).value)">
+          <option value="paper">Paper</option>
+          <option value="vanilla">Vanilla</option>
+          <option value="purpur">Purpur</option>
+          <option value="spigot">Spigot</option>
+          <option value="fabric">Fabric</option>
+          <option value="quilt">Quilt</option>
+          <option value="forge">Forge</option>
+          <option value="neoforge">NeoForge</option>
+        </select>
+        <input class="h-9 rounded border border-line bg-canvas px-2" placeholder="Version, for example 26.3" [value]="nextVersion()" (input)="nextVersion.set($any($event.target).value)" />
+        <button type="submit" class="h-9 w-fit rounded bg-accent px-3 text-sm text-white" [disabled]="busy()">Change version</button>
+      </form>
+    }
+    @case ('databases') {
+      <p class="max-w-xl text-sm text-faint">Hotbar installs MariaDB on this computer and creates a database for this server. It listens only on 127.0.0.1. If Docker or MariaDB is missing, Hotbar asks before downloading either one.</p>
+      <form class="mt-3 flex gap-2" (submit)="addDatabase($event)">
+        <input class="h-9 rounded border border-line bg-canvas px-2" [value]="databaseName()" (input)="databaseName.set($any($event.target).value)" [disabled]="busy()" />
+        <button type="submit" class="h-9 rounded bg-accent px-3 text-sm text-white" [disabled]="busy()">{{ busy() ? 'Installing…' : 'Create' }}</button>
+      </form>
+      <ul class="mt-3 divide-y divide-line rounded border border-line">
+        @for (database of databases(); track database.id) {
+          <li class="px-3 py-3 text-sm">
+            <div class="font-mono">{{ database.name }}</div>
+            @if (database.kind === 'mariadb') {
+              <dl class="mt-2 grid gap-1 text-faint">
+                <div>Host <span class="font-mono text-ink">{{ database.host }}</span></div>
+                <div>Port <span class="font-mono text-ink">{{ database.port }}</span></div>
+                <div>Database <span class="font-mono text-ink">{{ database.dbName }}</span></div>
+                <div>User <span class="font-mono text-ink">{{ database.username }}</span></div>
+              </dl>
+              @if (shownPasswordId() === database.id) {
+                <p class="mt-2 font-mono text-xs text-ink">{{ shownPassword() }}</p>
+              }
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="showDatabasePassword(database.id)">{{ shownPasswordId() === database.id ? 'Hide password' : 'Show password' }}</button>
+                <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="rotateDatabase(database.id)" [disabled]="busy()">New password</button>
+                <button type="button" class="h-8 rounded px-2 text-sm text-danger" (click)="removeDatabase(database.id)" [disabled]="busy()">Delete</button>
+              </div>
+            } @else {
+              <p class="mt-1 text-faint">{{ database.kind }} file kept from an earlier Hotbar version.</p>
+            }
+          </li>
+        } @empty {
+          <li class="px-3 py-3 text-sm text-faint">No databases for this server.</li>
+        }
+      </ul>
+    }
+  }
+</section>
+@if (promptItems(); as items) {
+  <app-download-prompt [items]="items" (agreed)="agreeDownload()" (cancelled)="cancelDownload()" />
+}

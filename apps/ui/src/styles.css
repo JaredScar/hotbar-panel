@@ -1,0 +1,98 @@
+@import "tailwindcss";
+@import "@xterm/xterm/css/xterm.css";
+
+@theme {
+  --color-canvas: #1c232e;
+  --color-bar: #141a22;
+  --color-surface: #273140;
+  --color-raised: #314055;
+  --color-line: #3c4a5c;
+  --color-ink: #edf1f6;
+  --color-faint: #93a0b0;
+  --color-accent: #4c8dff;
+  --color-running: #3dce86;
+  --color-starting: #e7b008;
+  --color-offline: #7b8796;
+  --color-danger: #e15d5d;
+  --font-sans: "Segoe UI", sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", monospace;
+}
+
+html,
+body,
+app-root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  color-scheme: dark;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a[href],
+button:not(:disabled),
+summary,
+select,
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+label:has(input[type="checkbox"], input[type="radio"], input[type="file"]) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.xterm {
+  padding: 8px 4px;
+}
+
+main {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+main > :not(router-outlet) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+app-server-list,
+app-machine-page,
+app-quick-create,
+app-panel-login {
+  display: block;
+  overflow: auto;
+}
+
+app-server-shell,
+app-console-page,
+app-properties-page,
+app-panel-shell {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}

@@ -5,9 +5,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const platforms = {
-  win: ['--win', 'nsis'],
-  mac: ['--mac', 'dmg'],
-  linux: ['--linux', 'deb', 'AppImage'],
+  win: ['--win', 'nsis', '--publish', 'never'],
+  mac: ['--mac', 'dmg', '--publish', 'never'],
+  linux: ['--linux', 'deb', 'AppImage', '--publish', 'never'],
 };
 
 const platform = process.argv[2] ?? '';

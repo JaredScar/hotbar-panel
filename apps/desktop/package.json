@@ -25,7 +25,7 @@
     "win": { "target": "nsis", "icon": "assets/brand-mark.png", "signExecutable": false },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "shortcutName": "Hotbar" },
     "mac": { "target": "dmg", "icon": "assets/brand-mark.png", "identity": null, "gatekeeperAssess": false, "category": "public.app-category.utilities" },
-    "linux": { "target": ["deb", "AppImage"], "icon": "assets/brand-mark.png", "category": "Utility", "executableName": "hotbar", "synopsis": "Install and run game servers", "maintainer": "Hotbar", "desktopName": "hotbar.desktop" },
+    "linux": { "target": ["deb", "AppImage"], "icon": "assets/brand-mark.png", "category": "Utility", "executableName": "hotbar", "synopsis": "Install and run game servers", "maintainer": "Hotbar" },
     "deb": { "packageName": "hotbar" }
   },
   "dependencies": {

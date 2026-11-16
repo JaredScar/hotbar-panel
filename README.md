@@ -74,9 +74,21 @@ Folders and files for that server. Upload, create a folder, or delete a file.
 
 ### Plugins
 
-What is in the plugins folder, plus a Modrinth search.
+Paper, Purpur, and Spigot search Modrinth for plugins that match the server version. Install asks before the jar is downloaded. Disable renames a jar to `.disabled`.
 
-![Plugins](docs/screenshots/plugins.png)
+![Plugins on Paper](docs/screenshots/plugins.png)
+
+![Confirm a plugin download](docs/screenshots/plugin-download.png)
+
+### Mods
+
+Fabric, Quilt, Forge, and NeoForge use the same page, labeled Mods.
+
+![Mods on Fabric](docs/screenshots/mods.png)
+
+Vanilla does not load plugins or mods.
+
+![Vanilla](docs/screenshots/plugins-vanilla.png)
 
 ### World
 

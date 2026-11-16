@@ -121,31 +121,51 @@
       </form>
     }
     @case ('plugins') {
-      <div class="mb-3 flex gap-2">
-        <input class="h-9 flex-1 rounded border border-line bg-canvas px-2" placeholder="Search Modrinth modpacks" [value]="query()" (input)="query.set($any($event.target).value)" />
-        <button type="button" class="h-9 rounded border border-line px-3 text-sm" [disabled]="busy()" (click)="findPacks()">Search</button>
-      </div>
-      <ul class="mb-4 divide-y divide-line rounded border border-line">
-        @for (pack of packs(); track pack.projectId) {
-          <li class="flex items-center gap-3 px-3 py-2 text-sm">
-            <span class="flex-1"><strong>{{ pack.title }}</strong><br /><span class="text-faint">{{ pack.description }}</span></span>
-            <button type="button" class="text-accent" [disabled]="busy()" (click)="installPack(pack.projectId)">Install</button>
-          </li>
-        }
-      </ul>
-      <p class="mb-2 text-sm text-faint">Files in the plugins folder. Disable renames a jar to .disabled. Stop the server before installing a pack.</p>
-      <ul class="divide-y divide-line rounded border border-line">
-        @for (entry of files(); track entry.path) {
-          <li class="flex items-center gap-3 px-3 py-2 text-sm">
-            <span class="flex-1">{{ entry.name }}</span>
-            @if (!entry.directory) {
-              <button type="button" (click)="togglePlugin(entry)">{{ entry.name.endsWith('.disabled') ? 'Enable' : 'Disable' }}</button>
-            }
-          </li>
-        } @empty {
-          <li class="px-3 py-4 text-sm text-faint">No plugins folder yet.</li>
-        }
-      </ul>
+      @if (!addonFolder()) {
+        <p class="text-sm text-faint">Vanilla does not load plugins or mods. On the Version tab, switch to Paper for plugins or Fabric for mods.</p>
+      } @else {
+        <form class="mb-3 flex gap-2" (submit)="findAddons(); $event.preventDefault()">
+          <input class="h-9 flex-1 rounded border border-line bg-canvas px-2" [placeholder]="addonFolder() === 'mods' ? 'Search Modrinth mods' : 'Search Modrinth plugins'" [value]="addonQuery()" (input)="addonQuery.set($any($event.target).value)" />
+          <button type="submit" class="h-9 rounded border border-line px-3 text-sm" [disabled]="busy()">Search</button>
+        </form>
+        <ul class="mb-4 divide-y divide-line rounded border border-line">
+          @for (addon of addons(); track addon.projectId) {
+            <li class="flex items-center gap-3 px-3 py-2 text-sm">
+              <span class="flex-1"><strong>{{ addon.title }}</strong><br /><span class="text-faint">{{ addon.description }}</span></span>
+              <button type="button" class="text-accent" [disabled]="busy()" (click)="installAddon(addon.projectId)">Install</button>
+            </li>
+          } @empty {
+            <li class="px-3 py-4 text-sm text-faint">No {{ addonFolder() === 'mods' ? 'mods' : 'plugins' }} on Modrinth match this server version.</li>
+          }
+        </ul>
+        <p class="mb-2 text-sm text-faint">Installed {{ addonFolder() === 'mods' ? 'mods' : 'plugins' }}. Disable renames a jar to .disabled. Stop the server before installing.</p>
+        <ul class="mb-6 divide-y divide-line rounded border border-line">
+          @for (entry of files(); track entry.path) {
+            <li class="flex items-center gap-3 px-3 py-2 text-sm">
+              <span class="flex-1">{{ entry.name }}</span>
+              @if (!entry.directory) {
+                <button type="button" (click)="togglePlugin(entry)">{{ entry.name.endsWith('.disabled') ? 'Enable' : 'Disable' }}</button>
+              }
+            </li>
+          } @empty {
+            <li class="px-3 py-4 text-sm text-faint">Nothing installed yet.</li>
+          }
+        </ul>
+        <h2 class="mb-2 text-sm font-semibold">Modpack</h2>
+        <p class="mb-2 text-sm text-faint">Install a whole pack instead of one jar. Stop the server first.</p>
+        <div class="mb-3 flex gap-2">
+          <input class="h-9 flex-1 rounded border border-line bg-canvas px-2" placeholder="Search Modrinth modpacks" [value]="query()" (input)="query.set($any($event.target).value)" />
+          <button type="button" class="h-9 rounded border border-line px-3 text-sm" [disabled]="busy()" (click)="findPacks()">Search</button>
+        </div>
+        <ul class="divide-y divide-line rounded border border-line">
+          @for (pack of packs(); track pack.projectId) {
+            <li class="flex items-center gap-3 px-3 py-2 text-sm">
+              <span class="flex-1"><strong>{{ pack.title }}</strong><br /><span class="text-faint">{{ pack.description }}</span></span>
+              <button type="button" class="text-accent" [disabled]="busy()" (click)="installPack(pack.projectId)">Install</button>
+            </li>
+          }
+        </ul>
+      }
     }
     @case ('world') {
       <p class="mb-2 text-sm text-faint">Reset takes a backup, then deletes the world folder. The server has to be stopped.</p>

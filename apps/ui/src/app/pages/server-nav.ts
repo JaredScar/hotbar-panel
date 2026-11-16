@@ -38,7 +38,7 @@ export class ServerNav {
       { label: 'Startup', path: link('startup'), exact: false },
       { label: 'Activity', path: link('activity'), exact: false },
       { label: 'Players', path: link('players'), exact: false },
-      { label: 'Plugins', path: link('plugins'), exact: false },
+      { label: contentTabLabel(this.templateId()), path: link('plugins'), exact: false },
       { label: 'World', path: link('world'), exact: false },
       { label: 'Properties', path: link('properties'), exact: false },
       { label: 'Version', path: link('version'), exact: false },
@@ -48,4 +48,10 @@ export class ServerNav {
     if (this.templateId() === 'fivem') tabs.splice(2, 0, { label: 'Resources', path: link('resources'), exact: false });
     return tabs;
   });
+}
+
+function contentTabLabel(templateId: string | null): string {
+  const provider = templateId?.startsWith('minecraft-') ? templateId.slice('minecraft-'.length) : '';
+  if (provider === 'fabric' || provider === 'quilt' || provider === 'forge' || provider === 'neoforge') return 'Mods';
+  return 'Plugins';
 }

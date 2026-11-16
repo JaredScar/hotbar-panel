@@ -5,12 +5,12 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { AgentConfig } from './config.js';
 import { createNamedDatabase, databasesFor, deleteNamedDatabase, revealDatabasePassword, rotateNamedDatabase } from './databases.js';
 import { acceptedDownloadIds, assertDownloadAccepted, databaseDownloadPlan } from './downloads.js';
-import { deleteSchedule, insertSchedule, listActivity, listSchedules } from './db.js';
+import { deleteSchedule, insertSchedule, listActivity, listSchedules, readInstall } from './db.js';
 import { HttpError } from './errors.js';
 import { listFiles, makeDirectory, readFileText, removePath, renamePath, saveUpload, writeFileText } from './files.js';
 import type { ServerManager } from './manager.js';
 import { createServerBackup, restoreServerBackup } from './minecraft/backup.js';
-import { installModpack, searchModpacks } from './modrinth.js';
+import { addonDownloadOffer, installAddon, installModpack, searchAddons, searchModpacks } from './modrinth.js';
 
 const CRON = /^(\*|[0-9]{1,2}(,[0-9]{1,2})*)(\s+(\*|[0-9]{1,2}(,[0-9]{1,2})*)){4}$/;
 
@@ -102,6 +102,19 @@ export async function runHostOp(
     await deleteNamedDatabase(db, config.dataDir, server.id, text('databaseId'));
     manager.note(server.id, 'database deleted');
     return { ok: true };
+  }
+  if (method === 'addons.search') {
+    const install = readInstall(db, server.id);
+    if (!install) throw new HttpError(400, 'this server has no Minecraft version yet');
+    return searchAddons(text('q'), install.provider, install.version);
+  }
+  if (method === 'addon.install') {
+    if (server.state !== 'offline') throw new HttpError(409, 'stop the server before installing');
+    const install = readInstall(db, server.id);
+    if (!install) throw new HttpError(400, 'this server has no Minecraft version yet');
+    assertDownloadAccepted(body, [addonDownloadOffer(install.provider, install.version)]);
+    const filename = await installAddon(server.cwd, text('projectId'), install.provider, install.version, (line) => manager.note(server.id, line));
+    return { ok: true, filename };
   }
   if (method === 'modpacks.search') return searchModpacks(text('q'));
   if (method === 'modpack.install') {

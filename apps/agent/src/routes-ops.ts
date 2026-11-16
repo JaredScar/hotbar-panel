@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { DatabaseSync } from 'node:sqlite';
 import { validateTemplate, type Permission } from '@hotbar/shared';
 import type { AgentConfig } from './config.js';
-import { deleteSchedule, insertSchedule, listSchedules } from './db.js';
+import { deleteSchedule, insertSchedule, listSchedules, readInstall } from './db.js';
 import { assertDownloadAccepted } from './downloads.js';
 import { eggToTemplate } from './eggs.js';
 import { HttpError } from './errors.js';
@@ -13,7 +13,7 @@ import { resolveExecutable } from './executable.js';
 import { listFiles, makeDirectory, readFileText, removePath, renamePath, saveUpload, writeFileText } from './files.js';
 import type { ServerManager } from './manager.js';
 import { createServerBackup, restoreServerBackup } from './minecraft/backup.js';
-import { installModpack, searchModpacks } from './modrinth.js';
+import { addonDownloadOffer, installAddon, installModpack, searchAddons, searchModpacks } from './modrinth.js';
 import { readSettings, writeSettings } from './settings.js';
 
 const CRON = /^(\*|[0-9]{1,2}(,[0-9]{1,2})*)(\s+(\*|[0-9]{1,2}(,[0-9]{1,2})*)){4}$/;
@@ -68,6 +68,37 @@ export function registerOps(
     guard(request, 'file.read');
     const query = (request.query as { q?: string }).q ?? '';
     return searchModpacks(query);
+  });
+
+  app.get('/api/servers/:id/addons', async (request) => {
+    guard(request, 'file.read');
+    const params = request.params as { id: string };
+    mustServer(manager, params.id);
+    const install = readInstall(db, params.id);
+    if (!install) throw new HttpError(400, 'this server has no Minecraft version yet');
+    const query = (request.query as { q?: string }).q ?? '';
+    try {
+      return await searchAddons(query, install.provider, install.version);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : 'search failed');
+    }
+  });
+
+  app.post('/api/servers/:id/addons', async (request) => {
+    guard(request, 'file.create');
+    const params = request.params as { id: string };
+    const server = mustServer(manager, params.id);
+    if (server.state !== 'offline') throw new HttpError(409, 'stop the server before installing');
+    const install = readInstall(db, params.id);
+    if (!install) throw new HttpError(400, 'this server has no Minecraft version yet');
+    const projectId = (request.body as { projectId?: string }).projectId ?? '';
+    assertDownloadAccepted(request.body, [addonDownloadOffer(install.provider, install.version)]);
+    try {
+      const filename = await installAddon(server.cwd, projectId, install.provider, install.version, (line) => manager.note(server.id, line));
+      return { ok: true, filename };
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : 'install failed');
+    }
   });
 
   app.post('/api/eggs', async (request) => {

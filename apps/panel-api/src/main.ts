@@ -232,6 +232,17 @@ class ApiController {
     return this.hub.rpc(this.user(request).id, param(request), 'modpack.install', request.body ?? {});
   }
 
+  @Get('servers/:id/addons')
+  addons(@Req() request: Request): Promise<unknown> {
+    const query = request.query as { q?: string };
+    return this.hub.rpc(this.user(request).id, param(request), 'addons.search', { q: query.q ?? '' });
+  }
+
+  @Post('servers/:id/addons')
+  installAddon(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'addon.install', request.body ?? {});
+  }
+
   @Get('servers/:id/databases/plan')
   databasePlan(@Req() request: Request): Promise<unknown> {
     return this.hub.rpc(this.user(request).id, param(request), 'databases.plan', {});

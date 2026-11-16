@@ -6,7 +6,7 @@ import test from 'node:test';
 import { eggToTemplate } from '../dist/eggs.js';
 import { listFiles, writeFileText } from '../dist/files.js';
 import { cronMatches, pruneBackupFiles } from '../dist/minecraft/backup.js';
-import { serverPackFiles } from '../dist/modrinth.js';
+import { addonFacets, addonSlot, pickAddonJar, safeJarName, serverPackFiles } from '../dist/modrinth.js';
 import { acceptSignedManifest } from '../dist/updates.js';
 import { generateEd25519 } from '../dist/sign.js';
 import { createPrivateKey, sign } from 'node:crypto';
@@ -41,6 +41,21 @@ test('modpack filter drops client-only files and paths that escape', () => {
   ]);
   assert.equal(kept.length, 1);
   assert.equal(kept[0]?.path, 'mods/a.jar');
+});
+
+test('addon install picks a checksummed jar for the server loader', () => {
+  assert.equal(addonSlot('vanilla'), null);
+  assert.equal(addonSlot('paper')?.folder, 'plugins');
+  assert.equal(addonSlot('fabric')?.folder, 'mods');
+  assert.deepEqual(addonFacets(addonSlot('paper')!, '26.3')[0], ['project_type:plugin']);
+  assert.equal(safeJarName('LuckPerms.jar'), 'LuckPerms.jar');
+  assert.equal(safeJarName('../LuckPerms.jar'), null);
+  const chosen = pickAddonJar([
+    { files: [{ url: 'https://example.com/evil.jar', filename: 'evil.jar', hashes: { sha1: 'bad' }, primary: true }] },
+    { files: [{ url: 'https://cdn.modrinth.com/data/abc/versions/def/LuckPerms.jar', filename: 'LuckPerms.jar', hashes: { sha1: 'abc' } }] },
+  ]);
+  assert.equal(chosen?.filename, 'LuckPerms.jar');
+  assert.equal(chosen?.sha1, 'abc');
 });
 
 test('egg conversion refuses to run a shell startup', () => {

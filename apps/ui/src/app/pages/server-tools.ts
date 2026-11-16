@@ -1,7 +1,7 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import type { ActivityEntry, BackupInfo, FileContent, FileEntry, ModpackHit, ScheduleInfo, ServerView } from '@hotbar/shared';
+import type { ActivityEntry, AddonHit, BackupInfo, FileContent, FileEntry, ModpackHit, ScheduleInfo, ServerView } from '@hotbar/shared';
 import { DownloadPrompt } from '../components/download-prompt';
 import { DataSource, type DatabaseInfo, type DownloadOffer } from '../core/data-source';
 import { formatBytes } from '../core/format';
@@ -28,7 +28,9 @@ export class ServerToolsPage {
   protected readonly schedules = signal<ScheduleInfo[]>([]);
   protected readonly activityRows = signal<ActivityEntry[]>([]);
   protected readonly packs = signal<ModpackHit[]>([]);
+  protected readonly addons = signal<AddonHit[]>([]);
   protected readonly query = signal('');
+  protected readonly addonQuery = signal('');
   protected readonly cron = signal('0 4 * * *');
   protected readonly task = signal('backup');
   protected readonly payload = signal('');
@@ -66,8 +68,24 @@ export class ServerToolsPage {
     if (!id) return;
     this.error.set(null);
     try {
-      if (this.tool() === 'files' || this.tool() === 'plugins' || this.tool() === 'world') {
-        const root = this.tool() === 'plugins' ? 'plugins' : this.tool() === 'world' ? 'world' : this.folder();
+      if (this.tool() === 'plugins') {
+        this.installed.set(await this.data.currentInstall(id));
+        const folder = folderForProvider(this.installed()?.provider);
+        this.folder.set(folder ?? '');
+        if (!folder) {
+          this.files.set([]);
+          this.addons.set([]);
+          return;
+        }
+        try {
+          this.files.set(await this.data.listFiles(id, folder));
+        } catch {
+          this.files.set([]);
+        }
+        this.addons.set(await this.data.searchAddons(id, this.addonQuery()));
+        return;
+      } else if (this.tool() === 'files' || this.tool() === 'world') {
+        const root = this.tool() === 'world' ? 'world' : this.folder();
         if (this.tool() !== 'files') this.folder.set(root);
         this.files.set(await this.data.listFiles(id, this.tool() === 'files' ? this.folder() : root));
       } else if (this.tool() === 'backups') {
@@ -89,7 +107,7 @@ export class ServerToolsPage {
         this.databases.set(await this.data.listDatabases(id));
       }
     } catch (error) {
-      if (this.tool() === 'plugins' || this.tool() === 'world') {
+      if (this.tool() === 'world') {
         this.files.set([]);
         return;
       }
@@ -208,6 +226,52 @@ export class ServerToolsPage {
       this.packs.set(await this.data.searchModpacks(this.query()));
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Search failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected addonFolder(): 'plugins' | 'mods' | null {
+    return folderForProvider(this.installed()?.provider);
+  }
+
+  protected async findAddons(): Promise<void> {
+    if (!this.addonFolder()) return;
+    this.busy.set(true);
+    try {
+      this.addons.set(await this.data.searchAddons(this.serverId(), this.addonQuery()));
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Search failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected installAddon(projectId: string): void {
+    const install = this.installed();
+    const label = this.addonFolder() === 'mods' ? 'mod' : 'plugin';
+    this.askDownload(
+      [
+        {
+          id: 'addon',
+          title: `Modrinth ${label}`,
+          detail: `One ${label} jar for ${install?.provider ?? 'this server'} ${install?.version ?? ''}, from Modrinth.`,
+        },
+      ],
+      () => this.runInstallAddon(projectId),
+    );
+  }
+
+  private async runInstallAddon(projectId: string): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.data.installAddon(this.serverId(), projectId, ['addon']);
+      const folder = this.addonFolder() ?? 'plugins';
+      this.notice.set(`Installed. Start the server to load the ${folder === 'mods' ? 'mod' : 'plugin'}.`);
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Install failed');
     } finally {
       this.busy.set(false);
     }
@@ -431,4 +495,10 @@ export class ServerToolsPage {
   protected startup(server: ServerView): string {
     return server.command.join(' ');
   }
+}
+
+function folderForProvider(provider: string | undefined): 'plugins' | 'mods' | null {
+  if (provider === 'fabric' || provider === 'quilt' || provider === 'forge' || provider === 'neoforge') return 'mods';
+  if (provider === 'paper' || provider === 'purpur' || provider === 'spigot') return 'plugins';
+  return null;
 }

@@ -13,4 +13,4 @@ export type { ZipEntry, ZipAssessment } from './zip-guard.js';
 export { assessZipEntries, ZIP_LIMITS } from './zip-guard.js';
 export type { GameId, McProviderId, McVersion, McGamemode, McDifficulty, McCreateRequest, ServerProperties, Reachability } from './minecraft.js';
 export { GAMES, MC_PROVIDERS } from './minecraft.js';
-export type { FileEntry, FileContent, BackupInfo, ScheduleInfo, ModpackHit, SetupStatus } from './ops.js';
+export type { FileEntry, FileContent, BackupInfo, ScheduleInfo, ModpackHit, AddonHit, SetupStatus } from './ops.js';

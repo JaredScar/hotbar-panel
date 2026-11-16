@@ -35,6 +35,13 @@ export interface ModpackHit {
   downloads: number;
 }
 
+export interface AddonHit {
+  projectId: string;
+  title: string;
+  description: string;
+  downloads: number;
+}
+
 export interface SetupStatus {
   completed: boolean;
   serversRoot: string;

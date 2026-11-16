@@ -13,6 +13,7 @@ import type {
   McCreateRequest,
   McProviderId,
   McVersion,
+  AddonHit,
   ModpackHit,
   PowerAction,
   Reachability,
@@ -309,6 +310,14 @@ export class LocalAgentDataSource extends DataSource {
 
   override async installModpack(id: string, projectId: string, acceptDownloads: string[]): Promise<void> {
     await this.request('POST', `/api/servers/${id}/modpack`, { projectId, acceptDownloads });
+  }
+
+  override searchAddons(id: string, query: string): Promise<AddonHit[]> {
+    return this.request<AddonHit[]>('GET', `/api/servers/${id}/addons?q=${encodeURIComponent(query)}`);
+  }
+
+  override async installAddon(id: string, projectId: string, acceptDownloads: string[]): Promise<void> {
+    await this.request('POST', `/api/servers/${id}/addons`, { projectId, acceptDownloads });
   }
 
   override activity(_serverId: string): Promise<ActivityEntry[]> {

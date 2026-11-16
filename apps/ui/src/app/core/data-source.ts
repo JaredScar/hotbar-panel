@@ -11,6 +11,7 @@ import type {
   McCreateRequest,
   McProviderId,
   McVersion,
+  AddonHit,
   ModpackHit,
   PowerAction,
   Reachability,
@@ -97,6 +98,8 @@ export abstract class DataSource {
   abstract deleteSchedule(id: string, scheduleId: string): Promise<void>;
   abstract searchModpacks(query: string): Promise<ModpackHit[]>;
   abstract installModpack(id: string, projectId: string, acceptDownloads: string[]): Promise<void>;
+  abstract searchAddons(id: string, query: string): Promise<AddonHit[]>;
+  abstract installAddon(id: string, projectId: string, acceptDownloads: string[]): Promise<void>;
   abstract activity(serverId: string): Promise<ActivityEntry[]>;
   abstract currentInstall(id: string): Promise<{ provider: string; version: string; javaMajor: number } | null>;
   abstract changeVersion(id: string, provider: string, version: string, acceptDownloads: string[]): Promise<{ provider: string; version: string }>;

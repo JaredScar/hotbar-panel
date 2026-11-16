@@ -13,6 +13,7 @@ import type {
   McCreateRequest,
   McProviderId,
   McVersion,
+  AddonHit,
   ModpackHit,
   PowerAction,
   Reachability,
@@ -207,6 +208,12 @@ export class PanelDataSource extends DataSource {
   }
   override async installModpack(id: string, projectId: string, acceptDownloads: string[]): Promise<void> {
     await this.session.request('POST', `/api/servers/${id}/modpack`, { projectId, acceptDownloads });
+  }
+  override searchAddons(id: string, query: string): Promise<AddonHit[]> {
+    return this.session.request('GET', `/api/servers/${id}/addons?q=${encodeURIComponent(query)}`);
+  }
+  override async installAddon(id: string, projectId: string, acceptDownloads: string[]): Promise<void> {
+    await this.session.request('POST', `/api/servers/${id}/addons`, { projectId, acceptDownloads });
   }
   override activity(serverId: string): Promise<ActivityEntry[]> {
     return this.session.request('GET', `/api/servers/${serverId}/activity`);

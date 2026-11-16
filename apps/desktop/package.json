@@ -26,7 +26,7 @@
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "shortcutName": "Hotbar" },
     "mac": { "target": "dmg", "icon": "assets/brand-mark.png", "identity": null, "gatekeeperAssess": false, "category": "public.app-category.utilities" },
     "linux": { "target": ["deb", "AppImage"], "icon": "assets/brand-mark.png", "category": "Utility", "executableName": "hotbar", "synopsis": "Install and run game servers", "maintainer": "Hotbar" },
-    "deb": { "packageName": "hotbar" }
+    "deb": { "packageName": "hotbar", "artifactName": "hotbar-${version}-${arch}.${ext}" }
   },
   "dependencies": {
     "@hotbar/shared": "workspace:*"

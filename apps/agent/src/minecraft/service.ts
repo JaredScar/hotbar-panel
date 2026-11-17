@@ -41,6 +41,7 @@ import {
   listProviderVersions,
 } from './providers.js';
 
+const MOTD_MAX = 256;
 const GAMEMODES = new Set<McGamemode>(['survival', 'creative', 'adventure', 'spectator']);
 const DIFFICULTIES = new Set<McDifficulty>(['peaceful', 'easy', 'normal', 'hard']);
 const EDITABLE = new Set([
@@ -107,19 +108,40 @@ export class MinecraftService {
   writeProperties(id: string, body: unknown): ServerProperties {
     const server = this.manager.get(id);
     const updates = readPropertyUpdates(body);
-    const nextPort = updates['server-port'] ? Number(updates['server-port']) : null;
-    if (nextPort !== null && nextPort !== server.allocation?.port) {
-      this.manager.setPort(id, nextPort);
-    }
     const file = resolveInJail(server.cwd, 'server.properties');
     const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '#Minecraft server properties\n';
+    const nextPort = updates['server-port'] ? Number(updates['server-port']) : null;
+    const filePort = Number(parseProperties(current)['server-port']);
+    const knownPort = server.allocation?.port ?? (Number.isInteger(filePort) ? filePort : null);
+    if (nextPort !== null && nextPort !== knownPort) {
+      this.manager.setPort(id, nextPort);
+    }
     let next: string;
     try {
       next = updateProperties(current, updates);
     } catch (error) {
       throw new HttpError(400, clip(error));
     }
-    fs.writeFileSync(file, next);
+    const temporary = `${file}.${process.pid}.tmp`;
+    try {
+      fs.writeFileSync(temporary, next);
+      try {
+        fs.renameSync(temporary, file);
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+        if (code !== 'EPERM' && code !== 'EEXIST' && code !== 'EBUSY') throw error;
+        fs.copyFileSync(temporary, file);
+        fs.rmSync(temporary, { force: true });
+      }
+    } catch (error) {
+      fs.rmSync(temporary, { force: true });
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+      if (code === 'EPERM' || code === 'EBUSY' || code === 'EACCES') {
+        throw new HttpError(409, 'server.properties is in use. Stop the server, then save again.');
+      }
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(500, 'could not write server.properties');
+    }
     return { values: parseProperties(next) };
   }
 
@@ -419,7 +441,7 @@ function readCreate(body: unknown): McCreateRequest {
     throw new HttpError(400, 'max players must be 1–1000');
   }
   const motd = typeof record.motd === 'string' ? record.motd : 'A Minecraft Server';
-  if (motd.length > 59 || /[\r\n\0]/.test(motd)) throw new HttpError(400, 'motd must be 59 characters or less');
+  if (motd.length > MOTD_MAX || /[\r\n\0]/.test(motd)) throw new HttpError(400, `motd must be ${MOTD_MAX} characters or less`);
   const seed = typeof record.seed === 'string' ? record.seed : '';
   if (seed.length > 64 || /[\r\n\0]/.test(seed)) throw new HttpError(400, 'seed is too long');
   if (typeof record.whitelist !== 'boolean' || typeof record.onlineMode !== 'boolean') {
@@ -468,7 +490,9 @@ function readPropertyUpdates(body: unknown): Record<string, string> {
   for (const key of ['white-list', 'enforce-whitelist', 'online-mode']) {
     if (updates[key] && updates[key] !== 'true' && updates[key] !== 'false') throw new HttpError(400, `${key} must be true or false`);
   }
-  if (updates.motd && updates.motd.length > 59) throw new HttpError(400, 'motd must be 59 characters or less');
+  if (updates.motd && (updates.motd.length > MOTD_MAX || /[\r\n\0]/.test(updates.motd))) {
+    throw new HttpError(400, `motd must be ${MOTD_MAX} characters or less, on one line. Use \\n for a second line.`);
+  }
   return updates;
 }
 

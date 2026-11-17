@@ -62,7 +62,7 @@ export class ServerManager {
       this.servers.set(def.id, this.blank(def));
     }
     this.timer = setInterval(() => {
-      void this.sample();
+      void this.sample().catch(() => undefined);
     }, 5000);
     this.timer.unref();
     for (const server of this.servers.values()) {

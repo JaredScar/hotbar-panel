@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +17,9 @@ const token = readToken(dataDir);
 let windowRef: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+let agentChild: ChildProcess | null = null;
+let agentRestarts = 0;
+let agentStartedAt = 0;
 
 if (process.env.HOTBAR_ELECTRON_USER_DATA) {
   app.setPath('userData', process.env.HOTBAR_ELECTRON_USER_DATA);
@@ -61,7 +64,11 @@ async function boot(): Promise<void> {
   void refreshTray();
   setInterval(() => {
     void refreshTray();
-  }, 5000);
+    if (quitting) return;
+    void agentIsUp().then((up) => {
+      if (!up) ensureAgent();
+    });
+  }, 2000);
 }
 
 function createWindow(): void {
@@ -166,6 +173,13 @@ async function refreshTray(): Promise<void> {
 }
 
 function ensureAgent(): void {
+  if (quitting) return;
+  if (agentChild && agentChild.exitCode === null) return;
+  const now = Date.now();
+  if (now - agentStartedAt < 2000) agentRestarts += 1;
+  else agentRestarts = 0;
+  if (agentRestarts > 5) return;
+  agentStartedAt = now;
   const entry = agentLaunch();
   const child = spawn(entry.command, entry.args, {
     detached: true,
@@ -173,6 +187,16 @@ function ensureAgent(): void {
     windowsHide: true,
     shell: false,
     env: entry.env,
+  });
+  agentChild = child;
+  child.on('exit', () => {
+    if (agentChild === child) agentChild = null;
+    if (quitting) return;
+    setTimeout(() => {
+      void agentIsUp().then((up) => {
+        if (!up) ensureAgent();
+      });
+    }, 500);
   });
   child.unref();
 }

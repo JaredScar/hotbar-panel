@@ -46,13 +46,24 @@ export class PropertiesPage {
       'server-port': current['server-port'] ?? '',
     };
     try {
-      const result = await this.data.writeProperties(this.serverId(), payload);
+      const result = await this.write(payload);
       this.values.set(result.values);
       this.saved.set(true);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Could not save');
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  private async write(payload: Record<string, string>) {
+    try {
+      return await this.data.writeProperties(this.serverId(), payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (!message.includes('Can’t reach the Hotbar agent') && !message.includes('did not answer')) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return this.data.writeProperties(this.serverId(), payload);
     }
   }
 

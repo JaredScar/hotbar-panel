@@ -26,6 +26,12 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const running = await startAgent(config);
   console.log(`HOTBAR_READY port=${running.port}`);
+  process.on('uncaughtException', (error) => {
+    console.error('agent kept running after an unexpected error', error instanceof Error ? error.message : 'unknown error');
+  });
+  process.on('unhandledRejection', (error) => {
+    console.error('agent kept running after an unexpected rejection', error instanceof Error ? error.message : 'unknown error');
+  });
   let closing = false;
   const shutdown = (): void => {
     if (closing) return;

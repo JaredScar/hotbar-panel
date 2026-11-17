@@ -50,9 +50,13 @@ export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
   const sockets = new Set<WebSocket>();
   const link = new PanelLink(config.dataDir, config.version);
   const manager = new ServerManager(db, (event) => {
-    broadcast(sockets, event, config.version);
-    link.forward(toWire(event, config.version));
-    if (event.type === 'removed' || (event.type === 'log' && event.line.line === 'server registered')) link.snapshot();
+    try {
+      broadcast(sockets, event, config.version);
+      link.forward(toWire(event, config.version));
+      if (event.type === 'removed' || (event.type === 'log' && event.line.line === 'server registered')) link.snapshot();
+    } catch {
+      // A browser or panel socket can throw while sending. That must not stop the agent.
+    }
   }, (message) => {
     void notifyWebhook(config.dataDir, message);
     notifyDesktop('Hotbar', message);
@@ -222,7 +226,11 @@ export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
     guard(request, 'startup.update');
     const id = (request.params as { id: string }).id;
     const saved = minecraft.writeProperties(id, request.body);
-    audit(db, request, 'server.properties', id, {});
+    try {
+      audit(db, request, 'server.properties', id, {});
+    } catch {
+      // The file is already saved. A log failure must not look like the agent died.
+    }
     return saved;
   });
 
@@ -410,16 +418,32 @@ export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
 }
 
 function sendRaw(sockets: Set<WebSocket>, event: AgentEvent): void {
-  const message = JSON.stringify(event);
-  for (const socket of sockets) {
-    if (socket.readyState === socket.OPEN) socket.send(message);
+  let message: string;
+  try {
+    message = JSON.stringify(event);
+  } catch {
+    return;
   }
+  deliver(sockets, message);
 }
 
 function broadcast(sockets: Set<WebSocket>, event: ManagerEvent, version: string): void {
-  const message = JSON.stringify(toWire(event, version));
+  let message: string;
+  try {
+    message = JSON.stringify(toWire(event, version));
+  } catch {
+    return;
+  }
+  deliver(sockets, message);
+}
+
+function deliver(sockets: Set<WebSocket>, message: string): void {
   for (const socket of sockets) {
-    if (socket.readyState === socket.OPEN) socket.send(message);
+    try {
+      if (socket.readyState === socket.OPEN) socket.send(message);
+    } catch {
+      sockets.delete(socket);
+    }
   }
 }
 

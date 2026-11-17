@@ -6,7 +6,7 @@
     <div class="mt-5 grid gap-3">
       <label class="text-sm">
         <span class="text-faint">Message of the day</span>
-        <input class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" maxlength="59" [value]="value('motd')" (input)="setValue('motd', $any($event.target).value)" />
+        <input class="mt-1 h-9 w-full rounded border border-line bg-canvas px-2" maxlength="256" [value]="value('motd')" (input)="setValue('motd', $any($event.target).value)" />
       </label>
       <label class="text-sm">
         <span class="text-faint">Port</span>

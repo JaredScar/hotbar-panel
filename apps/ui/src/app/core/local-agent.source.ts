@@ -390,12 +390,20 @@ export class LocalAgentDataSource extends DataSource {
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch {
-      this.connected.set(false);
-      this.connectionError.set('Can’t reach the Hotbar agent on this machine.');
-      throw new Error('Can’t reach the Hotbar agent on this machine.');
+      const live = this.socket?.readyState === WebSocket.OPEN;
+      if (!live) {
+        this.connected.set(false);
+        this.connectionError.set('Can’t reach the Hotbar agent on this machine.');
+      }
+      throw new Error(live ? 'The agent did not answer. Try again.' : 'Can’t reach the Hotbar agent on this machine.');
     }
     if (response.status === 204) return undefined as T;
-    const payload = (await response.json()) as T & { error?: string };
+    let payload: T & { error?: string };
+    try {
+      payload = (await response.json()) as T & { error?: string };
+    } catch {
+      throw new Error('The agent returned an incomplete response. Try again.');
+    }
     if (!response.ok) {
       throw new Error(payload.error ?? `Request failed (${response.status})`);
     }

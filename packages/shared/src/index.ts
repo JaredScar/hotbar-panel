@@ -7,6 +7,8 @@ export { PERMISSIONS, PERMISSION_GROUPS, hasPermission } from './permissions.js'
 export type { TemplateFile, TemplateVariable, TemplateValidation } from './template.js';
 export { ALLOWED_INSTALL_STEPS, validateTemplate } from './template.js';
 export type { MachineInfo, HotbarCapabilities } from './machine.js';
+export type { ReleaseFile } from './release.js';
+export { chooseReleaseFile, isNewer, isOfficialDownload, isReleaseRedirect, parseVersion, RELEASE_REPOSITORY } from './release.js';
 export type { ActivityEntry } from './activity.js';
 export { substituteArg, substituteCommand } from './args.js';
 export type { ZipEntry, ZipAssessment } from './zip-guard.js';

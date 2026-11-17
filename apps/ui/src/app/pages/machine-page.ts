@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import type { MachineInfo } from '@hotbar/shared';
+import { AppUpdate } from '../core/app-update';
 import { DataSource } from '../core/data-source';
 import { formatBytes, formatUptime } from '../core/format';
 
@@ -9,6 +10,7 @@ import { formatBytes, formatUptime } from '../core/format';
 })
 export class MachinePage {
   private readonly data = inject(DataSource);
+  protected readonly updates = inject(AppUpdate);
   protected readonly machine = signal<MachineInfo | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly linkError = signal<string | null>(null);

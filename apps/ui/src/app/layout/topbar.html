@@ -1,3 +1,4 @@
+<div>
 <header class="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-bar px-4">
   <a routerLink="/" class="flex items-center gap-2.5 text-ink no-underline">
     <img src="brand-logo.png" alt="" class="h-8 w-auto" />
@@ -39,3 +40,27 @@
     </span>
   </div>
 </header>
+@if (updates.available()) {
+  <div class="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-2 text-sm">
+    <p>Hotbar {{ updates.latest() }} is available.@if (updates.canInstall()) { Game servers keep running while it installs. }</p>
+    <div class="flex items-center gap-3">
+      @if (updates.progress() !== null) {
+        <span class="text-faint">Downloading {{ updates.progress() }}%</span>
+      }
+      @if (updates.canInstall()) {
+        <button type="button" class="h-8 rounded bg-accent px-3 font-medium text-white" [disabled]="updates.busy()" (click)="updates.install()">
+          {{ updates.busy() ? 'Downloading…' : 'Update' }}
+        </button>
+      } @else if (updates.releaseUrl(); as url) {
+        <a class="inline-flex h-8 items-center rounded bg-accent px-3 font-medium text-white no-underline" [href]="url" target="_blank" rel="noopener">Download</a>
+      }
+    </div>
+  </div>
+}
+@if (updates.error(); as message) {
+  <p class="border-b border-line px-4 py-2 text-sm text-danger">{{ message }}</p>
+}
+@if (updates.message(); as message) {
+  <p class="border-b border-line px-4 py-2 text-sm text-running">{{ message }}</p>
+}
+</div>

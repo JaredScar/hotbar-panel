@@ -3,9 +3,11 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, Menu, Tray, ipcMain, session } from 'electron';
+import { app, BrowserWindow, Menu, Tray, ipcMain, session, type WebContents } from 'electron';
 import { defaultDataDir } from '@hotbar/shared/node';
 import { appIcon, trayIcon } from './icon.js';
+import { handOffInstaller } from './install-update.js';
+import { downloadRelease, fetchLatestRelease, type UpdateOffer } from './release-download.js';
 import { serveUi } from './ui-server.js';
 
 let uiUrl = process.env.HOTBAR_UI_URL ?? '';
@@ -20,6 +22,8 @@ let quitting = false;
 let agentChild: ChildProcess | null = null;
 let agentRestarts = 0;
 let agentStartedAt = 0;
+let updateOffer: UpdateOffer | null = null;
+let updateRunning = false;
 
 if (process.env.HOTBAR_ELECTRON_USER_DATA) {
   app.setPath('userData', process.env.HOTBAR_ELECTRON_USER_DATA);
@@ -58,6 +62,8 @@ async function boot(): Promise<void> {
     token,
     capabilities: { tray: true, notifications: false, openFolder: false },
   }));
+  ipcMain.handle('update:check', () => checkForUpdate());
+  ipcMain.handle('update:install', (event) => installUpdate(event.sender));
   if (!(await agentIsUp())) ensureAgent();
   await waitForUrl(uiUrl, 60_000);
   createWindow();
@@ -111,6 +117,42 @@ function installCsp(): void {
     };
     callback({ responseHeaders });
   });
+}
+
+async function checkForUpdate(): Promise<{ current: string; latest: string; available: boolean; releaseUrl: string | null; packaged: boolean }> {
+  const current = app.getVersion();
+  const offer = await fetchLatestRelease(current, process.platform, process.arch);
+  updateOffer = offer;
+  return {
+    current,
+    latest: offer.latest || current,
+    available: offer.available,
+    releaseUrl: offer.releaseUrl,
+    packaged: app.isPackaged,
+  };
+}
+
+async function installUpdate(sender: WebContents): Promise<{ replacing: boolean }> {
+  if (!app.isPackaged) throw new Error('Install the Hotbar setup program to update from here.');
+  if (updateRunning) throw new Error('An update is already downloading.');
+  updateRunning = true;
+  try {
+    const offer = updateOffer?.file ? updateOffer : await fetchLatestRelease(app.getVersion(), process.platform, process.arch);
+    if (!offer.file) throw new Error('Hotbar is already up to date.');
+    const destination = path.join(app.getPath('temp'), offer.file.name);
+    await downloadRelease(offer.file, destination, (received, total) => {
+      if (!sender.isDestroyed()) sender.send('update:progress', { received, total });
+    });
+    handOffInstaller(destination, process.execPath, app.getPath('temp'));
+    const replacing = process.platform === 'win32';
+    if (replacing) {
+      quitting = true;
+      app.quit();
+    }
+    return { replacing };
+  } finally {
+    updateRunning = false;
+  }
 }
 
 function packagedUiRoot(): string {

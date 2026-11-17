@@ -16,6 +16,21 @@ after(async () => {
   await Promise.all(agents.map((agent) => agent.close()));
 });
 
+test('a browser on this machine can save settings', async () => {
+  const agent = await boot('*');
+  const response = await fetch(url(agent, '/api/health'), {
+    method: 'OPTIONS',
+    headers: {
+      origin: 'http://127.0.0.1:4200',
+      'access-control-request-method': 'PUT',
+      'access-control-request-headers': 'authorization,content-type',
+    },
+  });
+  assert.equal(response.status, 204);
+  assert.match(response.headers.get('access-control-allow-methods') ?? '', /\bPUT\b/);
+  assert.match(response.headers.get('access-control-allow-methods') ?? '', /\bDELETE\b/);
+});
+
 test('builtin templates match the allow-list', () => {
   for (const name of ['fivem', 'echo', 'custom']) {
     const file = fileURLToPath(new URL(`../../../templates/${name}/template.yaml`, import.meta.url));

@@ -91,6 +91,7 @@ export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
       }
       callback(null, false);
     },
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['authorization', 'content-type'],
   });
   await app.register(websocket);

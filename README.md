@@ -62,13 +62,13 @@ Live log, command line, power buttons, and CPU, memory, and network charts.
 
 ### Properties
 
-`server.properties` as a form: port, gamemode, difficulty, and the rest.
+The whole `server.properties` file, grouped and searchable. A save writes only the settings you change. Restart the server before players see them, and stop it before changing the port.
 
 ![Properties](docs/screenshots/properties.png)
 
 ### Files
 
-Folders and files for that server. Upload, create a folder, or delete a file.
+Folders and files for that server. Right-click a file, or use More, to rename, copy, or delete it. Text files open in the editor. Ctrl+S saves.
 
 ![Files](docs/screenshots/files.png)
 
@@ -110,7 +110,7 @@ A daily backup, or any start, stop, restart, or console command on a cron.
 
 ### Players
 
-Send a console command such as `list` or `whitelist on`. The server has to be running.
+Operators, the whitelist, and bans, plus who is online when the server is running. Kick, ban, and operator changes apply to that player. The whitelist can be changed while the server is stopped.
 
 ![Players](docs/screenshots/players.png)
 
@@ -134,13 +134,13 @@ Hotbar installs MariaDB on this computer and creates a database, user, and passw
 
 ### Network
 
-The join address, plus SFTP on this computer only. The username is the server id.
+The join address, and whether this computer is accepting that port. SFTP listens on this computer only. The password stays hidden until you show it.
 
 ![Network](docs/screenshots/network.png)
 
 ### Startup
 
-The launch command. Folder paths are hidden. The stop command is `stop`, and Hotbar kills the process if it is still running after 60 seconds.
+Memory, start with Hotbar, restart after a crash, and the stop command. Change memory while the server is stopped. The folder path is hidden.
 
 ![Startup](docs/screenshots/startup.png)
 
@@ -152,7 +152,7 @@ What Hotbar did for this server, including the reads that refresh the list.
 
 ### FiveM resources
 
-Reorder `ensure` lines, then save `server.cfg`.
+Reorder `ensure` lines, then edit `server.cfg` and save it.
 
 ![FiveM resources](docs/screenshots/resources.png)
 

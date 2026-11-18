@@ -3,13 +3,14 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { ActivityEntry, AddonHit, BackupInfo, FileContent, FileEntry, ModpackHit, ScheduleInfo, ServerView } from '@hotbar/shared';
 import { CodeEditor, languageLabel } from '../components/code-editor';
+import { PlayersPanel } from './players-panel';
 import { DownloadPrompt } from '../components/download-prompt';
 import { DataSource, type DatabaseInfo, type DownloadOffer } from '../core/data-source';
 import { formatBytes } from '../core/format';
 
 @Component({
   selector: 'app-server-tools',
-  imports: [RouterLink, DownloadPrompt, CodeEditor],
+  imports: [RouterLink, DownloadPrompt, CodeEditor, PlayersPanel],
   templateUrl: './server-tools.html',
 })
 export class ServerToolsPage {
@@ -45,7 +46,6 @@ export class ServerToolsPage {
   protected readonly leaving = signal(false);
   private leaveAction: (() => Promise<void>) | null = null;
   protected readonly languageLabel = languageLabel;
-  protected readonly command = signal('list');
   protected readonly nextVersion = signal('');
   protected readonly nextProvider = signal('paper');
   protected readonly installed = signal<{ provider: string; version: string; javaMajor: number } | null>(null);
@@ -485,14 +485,6 @@ export class ServerToolsPage {
       this.error.set(error instanceof Error ? error.message : 'Install failed');
     } finally {
       this.busy.set(false);
-    }
-  }
-
-  protected async send(line: string): Promise<void> {
-    try {
-      await this.data.sendCommand(this.serverId(), line);
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Command failed');
     }
   }
 

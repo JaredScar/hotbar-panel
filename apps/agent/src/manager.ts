@@ -48,6 +48,7 @@ export type ManagerEvent =
 
 export class ServerManager {
   private readonly servers = new Map<string, LiveServer>();
+  private readonly waiters: Array<(line: LogLine) => void> = [];
   private timer: NodeJS.Timeout | null = null;
   private sampleTick = 0;
 
@@ -168,6 +169,36 @@ export class ServerManager {
     server.def.updatedAt = new Date().toISOString();
     updateServerCommand(this.db, id, resolved, server.def.updatedAt);
     return this.view(server);
+  }
+
+  /** Resolves with the first stdout or stderr line that `match` accepts. */
+  expect<T>(serverId: string, match: (line: string) => T | null, timeoutMs: number): { promise: Promise<T | null>; cancel: () => void } {
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    let resolvePromise: (value: T | null) => void = () => undefined;
+    const promise = new Promise<T | null>((resolve) => {
+      resolvePromise = resolve;
+    });
+    const finish = (value: T | null): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      const index = this.waiters.indexOf(onLine);
+      if (index >= 0) this.waiters.splice(index, 1);
+      resolvePromise(value);
+    };
+    const onLine = (line: LogLine): void => {
+      if (line.serverId !== serverId || line.stream === 'system') return;
+      try {
+        const value = match(line.line);
+        if (value !== null) finish(value);
+      } catch {
+        // A matcher failure must not stop the log stream.
+      }
+    };
+    timer = setTimeout(() => finish(null), timeoutMs);
+    this.waiters.push(onLine);
+    return { promise, cancel: () => finish(null) };
   }
 
   send(id: string, line: string): void {
@@ -310,6 +341,7 @@ export class ServerManager {
     };
     server.logs.push(entry);
     if (server.logs.length > LOG_LIMIT) server.logs.splice(0, server.logs.length - LOG_LIMIT);
+    for (const waiter of [...this.waiters]) waiter(entry);
     this.listener({ type: 'log', serverId: server.def.id, line: entry });
   }
 

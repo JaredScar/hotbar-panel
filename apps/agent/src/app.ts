@@ -20,6 +20,7 @@ import { listActivity, openDatabase, writeActivity } from './db.js';
 import { HttpError } from './errors.js';
 import { ServerManager, type ManagerEvent } from './manager.js';
 import { startBackupLoop } from './minecraft/backup.js';
+import { actOnPlayer, collectPlayers } from './minecraft/players.js';
 import { MinecraftService } from './minecraft/service.js';
 import { PanelLink } from './panel-link.js';
 import { notifyDesktop } from './notify.js';
@@ -196,6 +197,21 @@ export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
     manager.send(id, line);
     audit(db, request, 'server.stdin', id, { bytes: line.length });
     return reply.code(204).send();
+  });
+
+  app.get('/api/servers/:id/players', async (request) => {
+    guard(request, 'server.read');
+    const id = (request.params as { id: string }).id;
+    return collectPlayers(manager, id);
+  });
+
+  app.post('/api/servers/:id/players', async (request) => {
+    guard(request, 'control.console');
+    const id = (request.params as { id: string }).id;
+    const body = request.body as { action?: string; name?: string; reason?: string };
+    const result = await actOnPlayer(manager, id, body?.action ?? '', body?.name ?? '', body?.reason ?? '');
+    audit(db, request, 'server.players', id, { action: body?.action ?? '' });
+    return result;
   });
 
   app.get('/api/servers/:id/logs', async (request) => {

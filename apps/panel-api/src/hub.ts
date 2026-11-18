@@ -27,6 +27,8 @@ const RPC_PERMISSION: Record<string, string> = {
   'addons.search': 'file.read',
   'addon.install': 'file.create',
   'install.read': 'startup.read',
+  'players.list': 'server.read',
+  'players.action': 'control.console',
   'version.change': 'startup.update',
 };
 

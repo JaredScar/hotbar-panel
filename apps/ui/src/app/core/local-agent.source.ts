@@ -13,6 +13,8 @@ import type {
   McCreateRequest,
   McProviderId,
   McVersion,
+  McPlayerAction,
+  McPlayers,
   AddonHit,
   ModpackHit,
   PowerAction,
@@ -90,6 +92,14 @@ export class LocalAgentDataSource extends DataSource {
 
   override async sendCommand(id: string, line: string): Promise<void> {
     await this.request<void>('POST', `/api/servers/${id}/stdin`, { line });
+  }
+
+  override players(id: string): Promise<McPlayers> {
+    return this.request<McPlayers>('GET', `/api/servers/${id}/players`);
+  }
+
+  override playerAction(id: string, input: { action: McPlayerAction; name?: string; reason?: string }): Promise<McPlayers> {
+    return this.request<McPlayers>('POST', `/api/servers/${id}/players`, input);
   }
 
   override statsHistory(id: string): readonly ServerStats[] {

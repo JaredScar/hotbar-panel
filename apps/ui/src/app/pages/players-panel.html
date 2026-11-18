@@ -1,0 +1,66 @@
+@if (!minecraft()) {
+  <p class="text-sm text-faint">This page lists Minecraft players. Use the console for other games.</p>
+} @else {
+  <div class="mb-3 flex flex-wrap items-center gap-2">
+    <p class="text-sm">{{ online() }} online@if (max() !== null) { of {{ max() }} }</p>
+    <span class="rounded-full border border-line px-2 py-0.5 text-xs text-faint">{{ whitelist() ? 'Whitelist on' : 'Whitelist off' }}</span>
+    <button type="button" class="h-8 rounded border border-line px-2 text-sm" [disabled]="busy()" (click)="act(whitelist() ? 'whitelist-off' : 'whitelist-on')">
+      {{ whitelist() ? 'Turn whitelist off' : 'Turn whitelist on' }}
+    </button>
+    <button type="button" class="h-8 rounded border border-line px-2 text-sm" [disabled]="busy()" (click)="refresh()">Refresh</button>
+    <input class="h-8 min-w-48 flex-1 rounded border border-line bg-canvas px-2 text-sm" placeholder="Reason for a kick or ban" [value]="reason()" (input)="reason.set($any($event.target).value)" />
+  </div>
+  @if (!running()) {
+    <p class="mb-3 text-sm text-faint">The server is stopped. Kick, ban, and operator changes wait until it is running. The whitelist switch still saves.</p>
+  }
+  @if (error()) {
+    <p class="mb-3 text-sm text-danger">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="mb-3 text-sm text-faint">{{ notice() }}</p>
+  }
+  <ul class="divide-y divide-line rounded border border-line">
+    @for (player of players(); track player.name) {
+      <li class="flex flex-wrap items-center gap-2 px-3 py-2 text-sm" [class.bg-surface]="menu()?.player?.name === player.name" (contextmenu)="openMenu($event, player)">
+        <span class="min-w-32 font-medium">{{ player.name }}</span>
+        <span class="flex flex-1 flex-wrap gap-1">
+          @if (player.online) {
+            <span class="rounded-full bg-surface px-2 py-0.5 text-xs text-running">Online</span>
+          }
+          @if (player.op) {
+            <span class="rounded-full bg-surface px-2 py-0.5 text-xs text-accent">Operator</span>
+          }
+          @if (player.whitelisted) {
+            <span class="rounded-full bg-surface px-2 py-0.5 text-xs text-faint">Whitelist</span>
+          }
+          @if (player.banned) {
+            <span class="rounded-full bg-surface px-2 py-0.5 text-xs text-danger">Banned{{ player.banReason ? ': ' + player.banReason : '' }}</span>
+          }
+        </span>
+        <button type="button" class="h-8 rounded border border-line px-2 text-sm" [disabled]="busy() || !running() || !player.online" (click)="act('kick', player)">Kick</button>
+        @if (player.banned) {
+          <button type="button" class="h-8 rounded border border-line px-2 text-sm" [disabled]="busy() || !running()" (click)="act('pardon', player)">Pardon</button>
+        } @else {
+          <button type="button" class="h-8 rounded border border-line px-2 text-sm text-danger" [disabled]="busy() || !running()" (click)="act('ban', player)">Ban</button>
+        }
+        <button type="button" class="h-8 rounded border border-line px-2 text-sm" [disabled]="busy() || !running()" (click)="act(player.op ? 'deop' : 'op', player)">{{ player.op ? 'Remove operator' : 'Make operator' }}</button>
+        <button type="button" class="text-faint" (click)="openMenu($event, player)">More</button>
+      </li>
+    } @empty {
+      <li class="px-3 py-4 text-sm text-faint">Nobody is on this list yet. Players appear after they join, or when they are on the whitelist, operator list, or ban list.</li>
+    }
+  </ul>
+  @if (menu(); as current) {
+    <div class="fixed inset-0 z-40" (click)="closeMenu()" (contextmenu)="closeMenu(); $event.preventDefault()"></div>
+    <ul class="fixed z-50 w-48 rounded border border-line bg-surface py-1 text-sm shadow-lg" role="menu" [style.left.px]="current.x" [style.top.px]="current.y">
+      <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" [disabled]="!running() || !current.player.online" (click)="act('kick', current.player)">Kick</button></li>
+      @if (current.player.banned) {
+        <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" [disabled]="!running()" (click)="act('pardon', current.player)">Pardon</button></li>
+      } @else {
+        <li><button type="button" class="block w-full px-3 py-1.5 text-left text-danger hover:bg-raised" [disabled]="!running()" (click)="act('ban', current.player)">Ban</button></li>
+      }
+      <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" [disabled]="!running()" (click)="act(current.player.op ? 'deop' : 'op', current.player)">{{ current.player.op ? 'Remove operator' : 'Make operator' }}</button></li>
+      <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" [disabled]="!running()" (click)="act(current.player.whitelisted ? 'whitelist-remove' : 'whitelist-add', current.player)">{{ current.player.whitelisted ? 'Remove from whitelist' : 'Add to whitelist' }}</button></li>
+    </ul>
+  }
+}

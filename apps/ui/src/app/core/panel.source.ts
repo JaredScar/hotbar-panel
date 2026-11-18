@@ -13,6 +13,8 @@ import type {
   McCreateRequest,
   McProviderId,
   McVersion,
+  McPlayerAction,
+  McPlayers,
   AddonHit,
   ModpackHit,
   PowerAction,
@@ -78,6 +80,14 @@ export class PanelDataSource extends DataSource {
     const view = await this.session.request<ServerView>('POST', `/api/servers/${id}/power`, { action });
     this.upsert(view);
     return view;
+  }
+
+  override players(id: string): Promise<McPlayers> {
+    return this.session.request('GET', `/api/servers/${id}/players`);
+  }
+
+  override playerAction(id: string, input: { action: McPlayerAction; name?: string; reason?: string }): Promise<McPlayers> {
+    return this.session.request('POST', `/api/servers/${id}/players`, input);
   }
 
   override async sendCommand(id: string, line: string): Promise<void> {

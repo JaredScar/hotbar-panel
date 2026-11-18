@@ -10,6 +10,7 @@ import { HttpError } from './errors.js';
 import { listFiles, makeDirectory, readFileText, removePath, renamePath, saveUpload, writeFileText } from './files.js';
 import type { ServerManager } from './manager.js';
 import { createServerBackup, restoreServerBackup } from './minecraft/backup.js';
+import { actOnPlayer, collectPlayers } from './minecraft/players.js';
 import { addonDownloadOffer, installAddon, installModpack, searchAddons, searchModpacks } from './modrinth.js';
 
 const CRON = /^(\*|[0-9]{1,2}(,[0-9]{1,2})*)(\s+(\*|[0-9]{1,2}(,[0-9]{1,2})*)){4}$/;
@@ -116,6 +117,8 @@ export async function runHostOp(
     const filename = await installAddon(server.cwd, text('projectId'), install.provider, install.version, (line) => manager.note(server.id, line));
     return { ok: true, filename };
   }
+  if (method === 'players.list') return collectPlayers(manager, server.id);
+  if (method === 'players.action') return actOnPlayer(manager, server.id, text('action'), text('name'), text('reason'));
   if (method === 'modpacks.search') return searchModpacks(text('q'));
   if (method === 'modpack.install') {
     if (server.state !== 'offline') throw new HttpError(409, 'stop the server before installing a modpack');

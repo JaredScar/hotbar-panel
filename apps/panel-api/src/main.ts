@@ -142,6 +142,16 @@ class ApiController {
     return this.hub.logs(this.user(request).id, param(request));
   }
 
+  @Get('servers/:id/players')
+  players(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'players.list', {});
+  }
+
+  @Post('servers/:id/players')
+  playerAction(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'players.action', request.body ?? {});
+  }
+
   @Get('servers/:id/files')
   files(@Req() request: Request): Promise<unknown> {
     const query = request.query as { path?: string };

@@ -11,6 +11,8 @@ import type {
   McCreateRequest,
   McProviderId,
   McVersion,
+  McPlayerAction,
+  McPlayers,
   AddonHit,
   ModpackHit,
   PowerAction,
@@ -70,6 +72,8 @@ export abstract class DataSource {
   abstract deleteServer(id: string): Promise<void>;
   abstract power(id: string, action: PowerAction): Promise<ServerView>;
   abstract sendCommand(id: string, line: string): Promise<void>;
+  abstract players(id: string): Promise<McPlayers>;
+  abstract playerAction(id: string, input: { action: McPlayerAction; name?: string; reason?: string }): Promise<McPlayers>;
   abstract statsHistory(id: string): readonly ServerStats[];
   abstract attachLogs(id: string, onLine: (line: LogLine) => void): Promise<() => void>;
   abstract listMinecraftVersions(provider: McProviderId, snapshots: boolean): Promise<McVersion[]>;

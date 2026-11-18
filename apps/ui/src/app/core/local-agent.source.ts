@@ -234,6 +234,12 @@ export class LocalAgentDataSource extends DataSource {
     return this.request<ServerProperties>('PUT', `/api/servers/${id}/properties`, { values });
   }
 
+  override async updateStartup(id: string, input: { memoryMb?: number; stopStdin?: string; stopTimeoutSec?: number; autoStart?: boolean; autoRestart?: boolean }): Promise<ServerView> {
+    const view = await this.request<ServerView>('POST', `/api/servers/${id}/startup`, input);
+    this.upsert(view);
+    return view;
+  }
+
   override async reachability(id: string): Promise<Reachability> {
     return this.request<Reachability>('GET', `/api/servers/${id}/reachability`);
   }

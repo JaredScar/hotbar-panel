@@ -117,6 +117,20 @@ export async function runHostOp(
     const filename = await installAddon(server.cwd, text('projectId'), install.provider, install.version, (line) => manager.note(server.id, line));
     return { ok: true, filename };
   }
+  if (method === 'startup.save') {
+    const memoryMb = input['memoryMb'] === undefined ? undefined : Number(input['memoryMb']);
+    const stopTimeoutMs = input['stopTimeoutSec'] === undefined ? undefined : Number(input['stopTimeoutSec']) * 1000;
+    if (input['memoryMb'] !== undefined && !Number.isInteger(memoryMb)) throw new HttpError(400, 'memory is not valid');
+    if (input['stopStdin'] !== undefined && typeof input['stopStdin'] !== 'string') throw new HttpError(400, 'stop command is not valid');
+    if (input['stopTimeoutSec'] !== undefined && !Number.isInteger(Number(input['stopTimeoutSec']))) throw new HttpError(400, 'stop timeout is not valid');
+    return manager.updateLaunch(server.id, {
+      ...(memoryMb !== undefined ? { memoryMb } : {}),
+      ...(typeof input['stopStdin'] === 'string' ? { stopStdin: input['stopStdin'] } : {}),
+      ...(stopTimeoutMs !== undefined ? { stopTimeoutMs } : {}),
+      ...(typeof input['autoStart'] === 'boolean' ? { autoStart: input['autoStart'] } : {}),
+      ...(typeof input['autoRestart'] === 'boolean' ? { autoRestart: input['autoRestart'] } : {}),
+    });
+  }
   if (method === 'players.list') return collectPlayers(manager, server.id);
   if (method === 'players.action') return actOnPlayer(manager, server.id, text('action'), text('name'), text('reason'));
   if (method === 'modpacks.search') return searchModpacks(text('q'));

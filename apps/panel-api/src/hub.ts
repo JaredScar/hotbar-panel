@@ -30,6 +30,7 @@ const RPC_PERMISSION: Record<string, string> = {
   'players.list': 'server.read',
   'players.action': 'control.console',
   'version.change': 'startup.update',
+  'startup.save': 'startup.update',
 };
 
 export class Hub {

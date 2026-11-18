@@ -239,6 +239,26 @@ export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
     return minecraft.readProperties((request.params as { id: string }).id);
   });
 
+  app.post('/api/servers/:id/startup', async (request) => {
+    guard(request, 'startup.update');
+    const id = (request.params as { id: string }).id;
+    const body = request.body as { memoryMb?: unknown; stopStdin?: unknown; stopTimeoutSec?: unknown; autoStart?: unknown; autoRestart?: unknown };
+    const memoryMb = body?.memoryMb === undefined ? undefined : Number(body.memoryMb);
+    const stopTimeoutMs = body?.stopTimeoutSec === undefined ? undefined : Number(body.stopTimeoutSec) * 1000;
+    if (body?.memoryMb !== undefined && !Number.isInteger(memoryMb)) throw new HttpError(400, 'memory is not valid');
+    if (body?.stopStdin !== undefined && typeof body.stopStdin !== 'string') throw new HttpError(400, 'stop command is not valid');
+    if (body?.stopTimeoutSec !== undefined && !Number.isInteger(Number(body.stopTimeoutSec))) throw new HttpError(400, 'stop timeout is not valid');
+    const view = manager.updateLaunch(id, {
+      ...(memoryMb !== undefined ? { memoryMb } : {}),
+      ...(typeof body?.stopStdin === 'string' ? { stopStdin: body.stopStdin } : {}),
+      ...(stopTimeoutMs !== undefined ? { stopTimeoutMs } : {}),
+      ...(typeof body?.autoStart === 'boolean' ? { autoStart: body.autoStart } : {}),
+      ...(typeof body?.autoRestart === 'boolean' ? { autoRestart: body.autoRestart } : {}),
+    });
+    audit(db, request, 'server.startup', id, {});
+    return view;
+  });
+
   app.put('/api/servers/:id/properties', async (request) => {
     guard(request, 'startup.update');
     const id = (request.params as { id: string }).id;

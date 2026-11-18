@@ -1,7 +1,7 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import type { ActivityEntry, AddonHit, BackupInfo, FileContent, FileEntry, ModpackHit, ScheduleInfo, ServerView } from '@hotbar/shared';
+import type { ActivityEntry, AddonHit, BackupInfo, FileContent, FileEntry, ModpackHit, Reachability, ScheduleInfo, ServerView } from '@hotbar/shared';
 import { CodeEditor, languageLabel } from '../components/code-editor';
 import { PlayersPanel } from './players-panel';
 import { DownloadPrompt } from '../components/download-prompt';
@@ -50,6 +50,14 @@ export class ServerToolsPage {
   protected readonly nextProvider = signal('paper');
   protected readonly installed = signal<{ provider: string; version: string; javaMajor: number } | null>(null);
   protected readonly sftp = signal<{ host: string; port: number; username: string; password: string } | null>(null);
+  protected readonly reach = signal<Reachability | null>(null);
+  protected readonly showSftp = signal(false);
+  protected readonly memoryMb = signal('');
+  protected readonly stopStdin = signal('stop');
+  protected readonly stopTimeout = signal('60');
+  protected readonly autoStart = signal(false);
+  protected readonly autoRestart = signal(false);
+  private startupTouched = false;
   protected readonly databases = signal<DatabaseInfo[]>([]);
   protected readonly databaseName = signal('game');
   protected readonly shownPasswordId = signal('');
@@ -68,6 +76,7 @@ export class ServerToolsPage {
     });
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.serverId.set(params.get('serverId') ?? '');
+      this.startupTouched = false;
       this.load();
     });
   }
@@ -112,6 +121,10 @@ export class ServerToolsPage {
         this.installed.set(await this.data.currentInstall(id));
       } else if (this.tool() === 'network') {
         this.sftp.set(await this.data.sftpInfo(id));
+        this.reach.set(await this.data.reachability(id));
+      } else if (this.tool() === 'startup') {
+        const current = this.server();
+        if (current && !this.startupTouched) this.fillStartup(current);
       } else if (this.tool() === 'databases') {
         this.databases.set(await this.data.listDatabases(id));
       }
@@ -669,9 +682,76 @@ export class ServerToolsPage {
     return server.allocation ? `${server.allocation.ip}:${server.allocation.port}` : 'No port reserved';
   }
 
-  protected startup(server: ServerView): string {
-    return server.command.join(' ');
+  protected launchOf(server: ServerView): { java: string; jar: string; memory: string; flags: string[] } {
+    return describeLaunch(server.command);
   }
+
+  protected fillStartup(server: ServerView): void {
+    const launch = describeLaunch(server.command);
+    this.memoryMb.set(launch.memory);
+    this.stopStdin.set(server.stop.stdin ?? '');
+    this.stopTimeout.set(String(Math.round(server.stop.timeoutMs / 1000)));
+    this.autoStart.set(server.autoStart);
+    this.autoRestart.set(server.autoRestart);
+  }
+
+  protected touchStartup(): void {
+    this.startupTouched = true;
+  }
+
+  protected async saveStartup(): Promise<void> {
+    const current = this.server();
+    if (!current) return;
+    const launch = describeLaunch(current.command);
+    const memory = Number(this.memoryMb());
+    const memoryChanged = launch.memory !== '' && String(memory) !== launch.memory;
+    if (memoryChanged && current.state !== 'offline') {
+      this.error.set('Stop the server before changing memory.');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const view = await this.data.updateStartup(this.serverId(), {
+        ...(memoryChanged ? { memoryMb: memory } : {}),
+        stopStdin: this.stopStdin(),
+        stopTimeoutSec: Number(this.stopTimeout()),
+        autoStart: this.autoStart(),
+        autoRestart: this.autoRestart(),
+      });
+      this.startupTouched = false;
+      this.fillStartup(view);
+      this.notice.set('Startup saved. Memory applies the next time the server starts.');
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not save startup');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async copyText(value: string, label: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+      this.notice.set(`Copied ${label}`);
+      this.error.set(null);
+    } catch {
+      this.error.set(`Could not copy ${label}`);
+    }
+  }
+}
+
+function describeLaunch(command: string[]): { java: string; jar: string; memory: string; flags: string[] } {
+  const jarIndex = command.indexOf('-jar');
+  const jar = jarIndex >= 0 ? command[jarIndex + 1] ?? '' : '';
+  const max = command.find((part) => /^-Xmx\d+[mMgG]$/.test(part)) ?? '';
+  const match = /^-Xmx(\d+)([mMgG])$/.exec(max);
+  const memory = !match ? '' : match[2].toLowerCase() === 'g' ? String(Number(match[1]) * 1024) : match[1];
+  const flags = command.filter((part, index) => {
+    if (index === 0 || part === 'nogui' || part === '-jar' || index === jarIndex + 1) return false;
+    if (/^-Xm[sx]\d+[mMgG]$/.test(part)) return false;
+    return true;
+  });
+  return { java: command[0] ?? '', jar, memory, flags };
 }
 
 function plainName(name: string): boolean {

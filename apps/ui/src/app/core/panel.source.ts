@@ -153,6 +153,12 @@ export class PanelDataSource extends DataSource {
     throw new Error('Edit properties on the host.');
   }
 
+  override async updateStartup(id: string, input: { memoryMb?: number; stopStdin?: string; stopTimeoutSec?: number; autoStart?: boolean; autoRestart?: boolean }): Promise<ServerView> {
+    const view = await this.session.request<ServerView>('POST', `/api/servers/${id}/startup`, input);
+    this.upsert(view);
+    return view;
+  }
+
   override async reachability(_id: string): Promise<Reachability> {
     throw new Error('Check the port on the host.');
   }

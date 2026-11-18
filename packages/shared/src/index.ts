@@ -14,6 +14,8 @@ export { substituteArg, substituteCommand } from './args.js';
 export type { ZipEntry, ZipAssessment } from './zip-guard.js';
 export { assessZipEntries, ZIP_LIMITS } from './zip-guard.js';
 export type { GameId, McProviderId, McVersion, McGamemode, McDifficulty, McCreateRequest, ServerProperties, Reachability } from './minecraft.js';
+export type { PropertyChoice, PropertyField, PropertyKind } from './server-properties.js';
+export { PROPERTY_FIELDS, PROPERTY_GROUPS, checkPropertyValue, propertyField } from './server-properties.js';
 export { GAMES, MC_PROVIDERS } from './minecraft.js';
 export type { FileEntry, FileContent, BackupInfo, ScheduleInfo, ModpackHit, AddonHit, SetupStatus } from './ops.js';
 export type { McPlayer, McPlayers, McPlayerAction } from './players.js';

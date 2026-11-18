@@ -40,3 +40,21 @@ export function argfileCommand(java: string, argsFile: string): string[] {
 export function jvmArgsFile(memoryMb: number): string {
   return `${heapArgs(memoryMb).join('\n')}\n`;
 }
+
+/** Replace -Xms and -Xmx. Other arguments stay where they are. */
+export function applyHeap(command: readonly string[], memoryMb: number): string[] {
+  if (!Number.isInteger(memoryMb) || memoryMb < 512 || memoryMb > 262144) {
+    throw new Error('memory must be a whole number of megabytes from 512 to 262144');
+  }
+  let sawMax = false;
+  const next = command.map((part) => {
+    if (/^-Xmx\d+[mMgG]$/.test(part)) {
+      sawMax = true;
+      return `-Xmx${memoryMb}M`;
+    }
+    if (/^-Xms\d+[mMgG]$/.test(part)) return `-Xms${Math.min(1024, memoryMb)}M`;
+    return part;
+  });
+  if (!sawMax) throw new Error('This startup has no -Xmx. Forge and NeoForge keep memory in user_jvm_args.txt.');
+  return next;
+}

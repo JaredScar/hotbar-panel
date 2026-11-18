@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import {
+  checkPropertyValue,
   GAMES,
   MC_PROVIDERS,
   type AgentEvent,
@@ -44,18 +45,6 @@ import {
 const MOTD_MAX = 256;
 const GAMEMODES = new Set<McGamemode>(['survival', 'creative', 'adventure', 'spectator']);
 const DIFFICULTIES = new Set<McDifficulty>(['peaceful', 'easy', 'normal', 'hard']);
-const EDITABLE = new Set([
-  'motd',
-  'gamemode',
-  'difficulty',
-  'max-players',
-  'white-list',
-  'enforce-whitelist',
-  'online-mode',
-  'level-seed',
-  'server-port',
-]);
-
 export class MinecraftService {
   private readonly versionCache = new Map<string, { at: number; versions: McVersion[] }>();
   private readonly javaJobs = new Map<number, Promise<string>>();
@@ -469,29 +458,14 @@ function readPropertyUpdates(body: unknown): Record<string, string> {
   if (!body || typeof body !== 'object') throw new HttpError(400, 'expected a JSON object');
   const values = (body as { values?: unknown }).values;
   if (!values || typeof values !== 'object') throw new HttpError(400, 'values are required');
+  const entries = Object.entries(values);
+  if (entries.length > 120) throw new HttpError(400, 'too many settings');
   const updates: Record<string, string> = {};
-  for (const [key, value] of Object.entries(values)) {
-    if (!EDITABLE.has(key)) throw new HttpError(400, `cannot edit ${key}`);
+  for (const [key, value] of entries) {
     if (typeof value !== 'string') throw new HttpError(400, `${key} must be a string`);
+    const problem = checkPropertyValue(key, value);
+    if (problem) throw new HttpError(400, problem);
     updates[key] = value;
-  }
-  if (updates['server-port'] && !/^[1-9][0-9]{0,4}$/.test(updates['server-port'])) {
-    throw new HttpError(400, 'port is not valid');
-  }
-  if (updates['server-port']) {
-    const port = Number(updates['server-port']);
-    if (port > 65535) throw new HttpError(400, 'port is not valid');
-  }
-  if (updates.gamemode && !GAMEMODES.has(updates.gamemode as McGamemode)) throw new HttpError(400, 'gamemode is not valid');
-  if (updates.difficulty && !DIFFICULTIES.has(updates.difficulty as McDifficulty)) throw new HttpError(400, 'difficulty is not valid');
-  if (updates['max-players'] && !/^[1-9][0-9]{0,3}$/.test(updates['max-players'])) {
-    throw new HttpError(400, 'max players is not valid');
-  }
-  for (const key of ['white-list', 'enforce-whitelist', 'online-mode']) {
-    if (updates[key] && updates[key] !== 'true' && updates[key] !== 'false') throw new HttpError(400, `${key} must be true or false`);
-  }
-  if (updates.motd && (updates.motd.length > MOTD_MAX || /[\r\n\0]/.test(updates.motd))) {
-    throw new HttpError(400, `motd must be ${MOTD_MAX} characters or less, on one line. Use \\n for a second line.`);
   }
   return updates;
 }

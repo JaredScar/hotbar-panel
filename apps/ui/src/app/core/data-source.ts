@@ -81,6 +81,7 @@ export abstract class DataSource {
   abstract onInstall(listener: (event: InstallProgress) => void): () => void;
   abstract readProperties(id: string): Promise<ServerProperties>;
   abstract writeProperties(id: string, values: Record<string, string>): Promise<ServerProperties>;
+  abstract updateStartup(id: string, input: { memoryMb?: number; stopStdin?: string; stopTimeoutSec?: number; autoStart?: boolean; autoRestart?: boolean }): Promise<ServerView>;
   abstract reachability(id: string): Promise<Reachability>;
   abstract linkPanel(url: string, code: string): Promise<MachineInfo>;
   abstract unlinkPanel(): Promise<MachineInfo>;

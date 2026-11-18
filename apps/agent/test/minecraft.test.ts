@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { minecraftCommand } from '../dist/minecraft/launch.js';
+import { applyHeap, minecraftCommand } from '../dist/minecraft/launch.js';
 import { assertAllowedUrl, digestMatches } from '../dist/minecraft/net.js';
 import { parseProperties, updateProperties } from '../dist/minecraft/properties.js';
 import { assertFivemUrl, fivemArtifact } from '../dist/minecraft/games.js';
@@ -55,6 +55,12 @@ test('server.properties edits keep comments and unknown keys', () => {
   assert.equal(parseProperties(updated).motd, 'new');
   assert.throws(() => updateProperties('', { 'bad key': 'x' }));
   assert.throws(() => updateProperties('', { motd: 'line\nbreak' }));
+});
+
+test('heap flags can be replaced without moving the other arguments', () => {
+  const next = applyHeap(['java', '-Xms1024M', '-Xmx7680M', '-XX:+UseG1GC', '-jar', 'server.jar', 'nogui'], 4096);
+  assert.deepEqual(next, ['java', '-Xms1024M', '-Xmx4096M', '-XX:+UseG1GC', '-jar', 'server.jar', 'nogui']);
+  assert.throws(() => applyHeap(['java', '@user_jvm_args.txt', 'nogui'], 2048));
 });
 
 test('the launch command is an argument array', () => {

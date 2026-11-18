@@ -89,6 +89,7 @@ app-panel-login {
 app-server-shell,
 app-console-page,
 app-properties-page,
+app-server-tools,
 app-panel-shell {
   display: flex;
   min-height: 0;

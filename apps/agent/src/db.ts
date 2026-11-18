@@ -204,6 +204,14 @@ export function updateServerCommand(db: DatabaseSync, id: string, command: strin
   db.prepare('UPDATE servers SET command_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(command), updatedAt, id);
 }
 
+export function updateServerStop(db: DatabaseSync, id: string, stop: ServerStop, updatedAt: string): void {
+  db.prepare('UPDATE servers SET stop_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(stop), updatedAt, id);
+}
+
+export function updateServerFlags(db: DatabaseSync, id: string, autoStart: boolean, autoRestart: boolean, updatedAt: string): void {
+  db.prepare('UPDATE servers SET auto_start = ?, auto_restart = ?, updated_at = ? WHERE id = ?').run(autoStart ? 1 : 0, autoRestart ? 1 : 0, updatedAt, id);
+}
+
 export function insertInstall(
   db: DatabaseSync,
   row: { serverId: string; provider: string; version: string; javaMajor: number },

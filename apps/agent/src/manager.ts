@@ -12,7 +12,8 @@ import {
   type ServerStats,
   type ServerView,
 } from '@hotbar/shared';
-import { deleteServerRow, insertServer, listServerRows, updateAllocation, updateServerCommand } from './db.js';
+import { deleteServerRow, insertServer, listServerRows, updateAllocation, updateServerCommand, updateServerFlags, updateServerStop } from './db.js';
+import { applyHeap } from './minecraft/launch.js';
 import { HttpError } from './errors.js';
 import { buildChildEnv, resolveExecutable } from './executable.js';
 import { redact, secretValues } from './redact.js';
@@ -169,6 +170,42 @@ export class ServerManager {
     server.def.updatedAt = new Date().toISOString();
     updateServerCommand(this.db, id, resolved, server.def.updatedAt);
     return this.view(server);
+  }
+
+  updateLaunch(
+    id: string,
+    input: { memoryMb?: number; stopStdin?: string; stopTimeoutMs?: number; autoStart?: boolean; autoRestart?: boolean },
+  ): ServerView {
+    const server = this.must(id);
+    if (input.memoryMb !== undefined) {
+      let next: string[];
+      try {
+        next = applyHeap(server.def.command, input.memoryMb);
+      } catch (error) {
+        throw new HttpError(400, error instanceof Error ? error.message : 'memory is not valid');
+      }
+      this.replaceCommand(id, next);
+    }
+    const current = this.must(id);
+    let changed = false;
+    if (input.stopStdin !== undefined || input.stopTimeoutMs !== undefined) {
+      const stdin = input.stopStdin !== undefined ? input.stopStdin : current.def.stop.stdin;
+      const timeoutMs = input.stopTimeoutMs ?? current.def.stop.timeoutMs;
+      if (stdin !== undefined && (stdin.includes('\0') || stdin.length > 200)) throw new HttpError(400, 'stop command is not valid');
+      if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600_000) throw new HttpError(400, 'stop timeout must be from 1 to 600 seconds');
+      current.def.stop = { ...current.def.stop, ...(stdin !== undefined ? { stdin } : {}), timeoutMs };
+      current.def.updatedAt = new Date().toISOString();
+      updateServerStop(this.db, id, current.def.stop, current.def.updatedAt);
+      changed = true;
+    }
+    if (input.autoStart !== undefined || input.autoRestart !== undefined) {
+      if (input.autoStart !== undefined) current.def.autoStart = input.autoStart;
+      if (input.autoRestart !== undefined) current.def.autoRestart = input.autoRestart;
+      current.def.updatedAt = new Date().toISOString();
+      updateServerFlags(this.db, id, current.def.autoStart, current.def.autoRestart, current.def.updatedAt);
+      changed = true;
+    }
+    return changed ? this.view(current) : this.view(this.must(id));
   }
 
   /** Resolves with the first stdout or stderr line that `match` accepts. */

@@ -142,6 +142,11 @@ class ApiController {
     return this.hub.logs(this.user(request).id, param(request));
   }
 
+  @Post('servers/:id/startup')
+  saveStartup(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'startup.save', request.body ?? {});
+  }
+
   @Get('servers/:id/players')
   players(@Req() request: Request): Promise<unknown> {
     return this.hub.rpc(this.user(request).id, param(request), 'players.list', {});

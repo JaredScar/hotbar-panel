@@ -126,19 +126,95 @@
     }
     @case ('network') {
       @if (server(); as current) {
-        <p class="text-lg">{{ address(current) }}</p>
-        <p class="mt-3 text-sm text-faint">SFTP listens on this computer only. The username is the server id.</p>
-        @if (sftp(); as info) {
-          <p class="mt-2 font-mono text-sm">sftp://{{ info.username }}@{{ info.host }}:{{ info.port }}</p>
-          <p class="font-mono text-sm">password {{ info.password }}</p>
-        }
+        <div class="grid max-w-3xl gap-4">
+          <section class="rounded border border-line bg-surface p-4">
+            <h2 class="text-sm font-semibold">Game address</h2>
+            <p class="mt-2 font-mono text-lg">{{ address(current) }}</p>
+            <p class="mt-1 text-sm text-faint">Players connect here. Hotbar does not open the firewall for you.</p>
+            @if (reach(); as probe) {
+              <p class="mt-2 text-sm">{{ probe.local ? 'Something on this computer is accepting that port.' : 'Nothing on this computer is accepting that port yet. Start the server, then check again.' }}</p>
+            }
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="copyText(address(current), 'the address')">Copy address</button>
+              <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="load()">Check again</button>
+            </div>
+          </section>
+          <section class="rounded border border-line bg-surface p-4">
+            <h2 class="text-sm font-semibold">SFTP</h2>
+            <p class="mt-1 text-sm text-faint">File transfer on this computer only. The username is the server id.</p>
+            @if (sftp(); as info) {
+              <dl class="mt-3 grid gap-2 text-sm">
+                <div class="flex flex-wrap items-center gap-2">Host <span class="font-mono">{{ info.host }}</span> <button type="button" class="text-accent" (click)="copyText(info.host, 'the host')">Copy</button></div>
+                <div class="flex flex-wrap items-center gap-2">Port <span class="font-mono">{{ info.port }}</span> <button type="button" class="text-accent" (click)="copyText(info.port + '', 'the port')">Copy</button></div>
+                <div class="flex flex-wrap items-center gap-2">Username <span class="font-mono">{{ info.username }}</span> <button type="button" class="text-accent" (click)="copyText(info.username, 'the username')">Copy</button></div>
+                <div class="flex flex-wrap items-center gap-2">
+                  Password
+                  <span class="font-mono">{{ showSftp() ? info.password : '••••••••••••' }}</span>
+                  <button type="button" class="text-accent" (click)="showSftp.set(!showSftp())">{{ showSftp() ? 'Hide' : 'Show' }}</button>
+                  <button type="button" class="text-accent" (click)="copyText(info.password, 'the password')">Copy</button>
+                </div>
+              </dl>
+            }
+          </section>
+        </div>
       }
     }
     @case ('startup') {
       @if (server(); as current) {
-        <p class="font-mono text-sm break-all">{{ startup(current) }}</p>
-        <p class="mt-3 text-sm text-faint">Working directory {{ current.cwd }}</p>
-        <p class="mt-1 text-sm text-faint">Stop command {{ current.stop.stdin || 'kill' }}, timeout {{ current.stop.timeoutMs / 1000 }}s</p>
+        <form class="grid max-w-3xl gap-4" (submit)="saveStartup(); $event.preventDefault()">
+          <section class="rounded border border-line bg-surface p-4">
+            <h2 class="text-sm font-semibold">Program</h2>
+            <p class="mt-2 break-all font-mono text-sm">{{ launchOf(current).java }}</p>
+            @if (launchOf(current).jar) {
+              <p class="mt-2 text-sm">Jar <span class="font-mono">{{ launchOf(current).jar }}</span></p>
+            }
+            @if (launchOf(current).memory) {
+              <label class="mt-3 block text-sm">
+                <span class="text-faint">Max memory, in MB</span>
+                <input class="mt-1 h-9 w-40 rounded border border-line bg-canvas px-2" [value]="memoryMb()" (input)="memoryMb.set($any($event.target).value); touchStartup()" />
+              </label>
+              <p class="mt-1 text-sm text-faint">Stop the server before saving a new memory size. It applies the next time the server starts.</p>
+            } @else {
+              <p class="mt-2 text-sm text-faint">This startup has no -Xmx. Forge and NeoForge keep memory in user_jvm_args.txt on the Files tab.</p>
+            }
+          </section>
+          <section class="rounded border border-line bg-surface p-4">
+            <h2 class="text-sm font-semibold">When it runs</h2>
+            <label class="mt-3 flex items-center gap-2 text-sm">
+              <input type="checkbox" [checked]="autoStart()" (change)="autoStart.set($any($event.target).checked); touchStartup()" />
+              Start when Hotbar starts
+            </label>
+            <label class="mt-2 flex items-center gap-2 text-sm">
+              <input type="checkbox" [checked]="autoRestart()" (change)="autoRestart.set($any($event.target).checked); touchStartup()" />
+              Restart after a crash
+            </label>
+          </section>
+          <section class="rounded border border-line bg-surface p-4">
+            <h2 class="text-sm font-semibold">How it stops</h2>
+            <label class="mt-3 block text-sm">
+              <span class="text-faint">Command sent to the console</span>
+              <input class="mt-1 h-9 w-full max-w-xs rounded border border-line bg-canvas px-2 font-mono" [value]="stopStdin()" (input)="stopStdin.set($any($event.target).value); touchStartup()" />
+            </label>
+            <label class="mt-3 block text-sm">
+              <span class="text-faint">Seconds to wait before forcing it closed</span>
+              <input class="mt-1 h-9 w-32 rounded border border-line bg-canvas px-2" [value]="stopTimeout()" (input)="stopTimeout.set($any($event.target).value); touchStartup()" />
+            </label>
+            <p class="mt-3 text-sm text-faint">Working directory</p>
+            <p class="mt-1 break-all font-mono text-sm">{{ current.cwd }}</p>
+            <button type="button" class="mt-2 h-8 rounded border border-line px-2 text-sm" (click)="copyText(current.cwd, 'the folder')">Copy folder</button>
+          </section>
+          @if (launchOf(current).flags.length > 0) {
+            <details class="rounded border border-line bg-surface p-4">
+              <summary class="text-sm font-semibold">JVM flags</summary>
+              <ul class="mt-3 grid gap-1">
+                @for (flag of launchOf(current).flags; track flag) {
+                  <li class="break-all font-mono text-xs text-faint">{{ flag }}</li>
+                }
+              </ul>
+            </details>
+          }
+          <button type="submit" class="h-9 w-fit rounded bg-accent px-3 text-sm text-white disabled:opacity-40" [disabled]="busy()">{{ busy() ? 'Saving…' : 'Save startup' }}</button>
+        </form>
       }
     }
     @case ('activity') {

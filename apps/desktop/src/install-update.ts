@@ -5,7 +5,7 @@ import path from 'node:path';
 const WINDOWS_HELPER = `import { spawn } from 'node:child_process';
 const installer = process.argv[2];
 setTimeout(() => {
-  const child = spawn(installer, ['/S'], { detached: true, stdio: 'ignore', windowsHide: false, shell: false });
+  const child = spawn(installer, ['/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: false, shell: false });
   child.unref();
 }, 2000);
 `;

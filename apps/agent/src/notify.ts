@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'assets', 'notify.ps1');
 
 export function notifyDesktop(title: string, body: string): void {
+  if (process.env.HOTBAR_DESKTOP === '1') return;
   const safeTitle = clip(title);
   const safeBody = clip(body);
   if (process.platform === 'win32') {

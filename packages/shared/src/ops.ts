@@ -42,6 +42,13 @@ export interface AddonHit {
   downloads: number;
 }
 
+export interface AddonUpdate {
+  filename: string;
+  projectId: string;
+  installedVersion: string;
+  latestVersion: string;
+}
+
 export interface SetupStatus {
   completed: boolean;
   serversRoot: string;

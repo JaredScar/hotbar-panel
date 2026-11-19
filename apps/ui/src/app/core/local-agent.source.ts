@@ -16,6 +16,7 @@ import type {
   McPlayerAction,
   McPlayers,
   AddonHit,
+  AddonUpdate,
   ModpackHit,
   PowerAction,
   Reachability,
@@ -340,6 +341,39 @@ export class LocalAgentDataSource extends DataSource {
     await this.request('POST', `/api/servers/${id}/addons`, { projectId, acceptDownloads });
   }
 
+  override checkAddonUpdates(id: string): Promise<AddonUpdate[]> {
+    return this.request<AddonUpdate[]>('GET', `/api/servers/${id}/addon-updates`);
+  }
+
+  override async updateAddon(id: string, filename: string, acceptDownloads: string[]): Promise<void> {
+    await this.request('POST', `/api/servers/${id}/addon-updates`, { filename, acceptDownloads });
+  }
+
+  override async zipPath(id: string, filePath: string): Promise<void> {
+    await this.request('POST', `/api/servers/${id}/files/zip`, { path: filePath });
+  }
+
+  override async unzipPath(id: string, filePath: string): Promise<void> {
+    await this.request('POST', `/api/servers/${id}/files/unzip`, { path: filePath });
+  }
+
+  override worldInfo(id: string): Promise<{ folder: string }> {
+    return this.request('GET', `/api/servers/${id}/world`);
+  }
+
+  override async downloadWorld(id: string): Promise<{ name: string; bytes: Uint8Array }> {
+    const response = await this.fetchRaw('GET', `/api/servers/${id}/world/archive`);
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const match = /filename="([^"]+)"/.exec(disposition);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return { name: match?.[1] || 'world.zip', bytes };
+  }
+
+  override async replaceWorld(id: string, bytes: Uint8Array): Promise<void> {
+    const response = await this.fetchRaw('POST', `/api/servers/${id}/world`, bytes, 'application/zip');
+    if (!response.ok) await this.readError(response);
+  }
+
   override activity(_serverId: string): Promise<ActivityEntry[]> {
     return this.request<ActivityEntry[]>('GET', '/api/activity');
   }
@@ -398,6 +432,35 @@ export class LocalAgentDataSource extends DataSource {
     });
   }
 
+  private async fetchRaw(method: string, pathname: string, body?: Uint8Array, contentType?: string): Promise<Response> {
+    let response: Response;
+    try {
+      response = await fetch(`${this.agentUrl}${pathname}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${this.token}`,
+          ...(contentType ? { 'content-type': contentType } : {}),
+        },
+        body: body ? blobFrom(body) : undefined,
+      });
+    } catch {
+      throw new Error('Can’t reach the Hotbar agent on this machine.');
+    }
+    if (!response.ok) await this.readError(response);
+    return response;
+  }
+
+  private async readError(response: Response): Promise<never> {
+    let message = `Request failed (${response.status})`;
+    try {
+      const payload = (await response.json()) as { error?: string };
+      if (payload.error) message = payload.error;
+    } catch {
+      // the body was not JSON
+    }
+    throw new Error(message);
+  }
+
   private async request<T>(method: string, pathname: string, body?: unknown): Promise<T> {
     let response: Response;
     try {
@@ -429,4 +492,10 @@ export class LocalAgentDataSource extends DataSource {
     }
     return payload;
   }
+}
+
+function blobFrom(bytes: Uint8Array): Blob {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  return new Blob([copy]);
 }

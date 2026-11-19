@@ -1,7 +1,7 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { MC_PROVIDERS, type ActivityEntry, type AddonHit, type BackupInfo, type FileContent, type FileEntry, type McProviderId, type McVersion, type ModpackHit, type Reachability, type ScheduleInfo, type ServerView } from '@hotbar/shared';
+import { MC_PROVIDERS, type ActivityEntry, type AddonHit, type AddonUpdate, type BackupInfo, type FileContent, type FileEntry, type McProviderId, type McVersion, type ModpackHit, type Reachability, type ScheduleInfo, type ServerView } from '@hotbar/shared';
 import { CodeEditor, languageLabel } from '../components/code-editor';
 import { PlayersPanel } from './players-panel';
 import { DownloadPrompt } from '../components/download-prompt';
@@ -31,6 +31,8 @@ export class ServerToolsPage {
   protected readonly activityRows = signal<ActivityEntry[]>([]);
   protected readonly packs = signal<ModpackHit[]>([]);
   protected readonly addons = signal<AddonHit[]>([]);
+  protected readonly addonUpdates = signal<AddonUpdate[]>([]);
+  protected readonly worldFolder = signal('world');
   protected readonly query = signal('');
   protected readonly addonQuery = signal('');
   protected readonly cron = signal('0 4 * * *');
@@ -116,7 +118,11 @@ export class ServerToolsPage {
         this.addons.set(await this.data.searchAddons(id, this.addonQuery()));
         return;
       } else if (this.tool() === 'files' || this.tool() === 'world') {
-        const root = this.tool() === 'world' ? 'world' : this.folder();
+        if (this.tool() === 'world') {
+          const info = await this.data.worldInfo(id);
+          this.worldFolder.set(info.folder || 'world');
+        }
+        const root = this.tool() === 'world' ? this.worldFolder() : this.folder();
         if (this.tool() !== 'files') this.folder.set(root);
         this.files.set(await this.data.listFiles(id, this.tool() === 'files' ? this.folder() : root));
       } else if (this.tool() === 'backups') {
@@ -293,6 +299,54 @@ export class ServerToolsPage {
       this.error.set(null);
     } catch {
       this.error.set('Could not copy the path');
+    }
+  }
+
+  protected dataRemote(): boolean {
+    return this.data.remote();
+  }
+
+  protected canOpenFolder(): boolean {
+    return typeof window.hotbar?.openFolder === 'function';
+  }
+
+  protected async openInFolder(relative = this.folder()): Promise<void> {
+    this.closeMenu();
+    try {
+      await window.hotbar?.openFolder?.(this.serverId(), relative);
+      this.error.set(null);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not open that folder');
+    }
+  }
+
+  protected async zipEntry(entry: FileEntry): Promise<void> {
+    this.closeMenu();
+    this.busy.set(true);
+    try {
+      await this.data.zipPath(this.serverId(), entry.path);
+      this.notice.set(`Zipped ${entry.name}.`);
+      this.error.set(null);
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not zip that folder');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async unzipEntry(entry: FileEntry): Promise<void> {
+    this.closeMenu();
+    this.busy.set(true);
+    try {
+      await this.data.unzipPath(this.serverId(), entry.path);
+      this.notice.set(`Unzipped ${entry.name}.`);
+      this.error.set(null);
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not unzip that file');
+    } finally {
+      this.busy.set(false);
     }
   }
 
@@ -480,6 +534,57 @@ export class ServerToolsPage {
     );
   }
 
+  protected updateFor(name: string): AddonUpdate | undefined {
+    return this.addonUpdates().find((item) => item.filename === name);
+  }
+
+  protected async checkUpdates(): Promise<void> {
+    if (!this.addonFolder()) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const updates = await this.data.checkAddonUpdates(this.serverId());
+      this.addonUpdates.set(updates);
+      this.notice.set(updates.length === 0 ? 'No newer files on Modrinth.' : `${updates.length} update${updates.length === 1 ? '' : 's'} available.`);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not check for updates');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected updateAddon(filename: string): void {
+    const update = this.updateFor(filename);
+    const label = this.addonFolder() === 'mods' ? 'mod' : 'plugin';
+    this.askDownload(
+      [
+        {
+          id: 'addon',
+          title: `Update ${filename}`,
+          detail: update
+            ? `Replace ${update.installedVersion} with ${update.latestVersion} from Modrinth. Stop the server first.`
+            : `Download the newest ${label} jar from Modrinth. Stop the server first.`,
+        },
+      ],
+      () => this.runUpdateAddon(filename),
+    );
+  }
+
+  private async runUpdateAddon(filename: string): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.data.updateAddon(this.serverId(), filename, ['addon']);
+      this.notice.set(`${filename} is updated. Start the server to load it.`);
+      this.addonUpdates.set(this.addonUpdates().filter((item) => item.filename !== filename));
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Update failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   private async runInstallAddon(projectId: string): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
@@ -599,11 +704,43 @@ export class ServerToolsPage {
     }
   }
 
+  protected async downloadWorld(): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const packed = await this.data.downloadWorld(this.serverId());
+      saveBytes(packed.name, packed.bytes);
+      this.notice.set(`Downloaded ${packed.name}.`);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not download the world');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async onWorldUpload(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.data.replaceWorld(this.serverId(), new Uint8Array(await file.arrayBuffer()));
+      this.notice.set('World replaced. A backup was written first. Start the server to load it.');
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not replace the world');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected async resetWorld(): Promise<void> {
     this.busy.set(true);
     try {
       await this.data.createBackup(this.serverId());
-      await this.data.deleteFile(this.serverId(), 'world');
+      await this.data.deleteFile(this.serverId(), this.worldFolder());
       this.error.set('The world folder was removed after a backup. Start the server to create a new world.');
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Could not reset the world');
@@ -843,6 +980,17 @@ function unusedCopyName(name: string, takenNames: string[]): string {
     count += 1;
   }
   return candidate;
+}
+
+function saveBytes(name: string, bytes: Uint8Array): void {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  const url = URL.createObjectURL(new Blob([copy], { type: 'application/zip' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function folderForProvider(provider: string | undefined): 'plugins' | 'mods' | null {

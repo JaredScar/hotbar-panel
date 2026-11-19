@@ -5,7 +5,6 @@ import type { AgentConfig } from '../config.js';
 import { listEnabledSchedules } from '../db.js';
 import { resolveExecutable } from '../executable.js';
 import type { ServerManager } from '../manager.js';
-import { notifyWebhook } from '../settings.js';
 import { run } from './network.js';
 
 export function cronMatches(cron: string, date: Date): boolean {
@@ -51,8 +50,7 @@ async function runDueSchedules(config: AgentConfig, manager: ServerManager, db: 
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown error';
-      manager.note(server.id, `schedule ${row.name} failed: ${message}`);
-      void notifyWebhook(config.dataDir, `Schedule ${row.name} failed for ${server.name}: ${message}`);
+      manager.alert(server.id, `Schedule ${row.name} failed for ${server.name}: ${message}`);
     }
   }
 }

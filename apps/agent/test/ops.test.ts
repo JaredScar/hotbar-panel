@@ -6,7 +6,8 @@ import test from 'node:test';
 import { eggToTemplate } from '../dist/eggs.js';
 import { listFiles, writeFileText } from '../dist/files.js';
 import { cronMatches, pruneBackupFiles } from '../dist/minecraft/backup.js';
-import { addonFacets, addonSlot, pickAddonJar, safeJarName, serverPackFiles } from '../dist/modrinth.js';
+import { parseTarListLine, replaceWorldFolder, worldFolderName, worldRootIn, zipFolder, unzipFile } from '../dist/archive.js';
+import { addonFacets, addonSlot, chooseAddonUpdates, pickAddonJar, safeJarName, serverPackFiles } from '../dist/modrinth.js';
 import { acceptSignedManifest } from '../dist/updates.js';
 import { generateEd25519 } from '../dist/sign.js';
 import { createPrivateKey, sign } from 'node:crypto';
@@ -68,6 +69,46 @@ test('egg conversion refuses to run a shell startup', () => {
   assert.equal(converted.template.startup.command[0], 'echo');
   assert.equal(converted.template.variables?.[0]?.key, 'SERVER_JARFILE');
   assert.ok(converted.notes.some((note) => note.includes('shell')));
+});
+
+test('addon update check keeps jars that are behind Modrinth', () => {
+  const updates = chooseAddonUpdates(
+    [{ filename: 'LuckPerms.jar', hash: 'abc' }],
+    { abc: { id: 'old', project_id: 'luck', version_number: '5.4' } },
+    { abc: { id: 'new', project_id: 'luck', version_number: '5.5' } },
+  );
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0]?.latestVersion, '5.5');
+  assert.equal(chooseAddonUpdates(
+    [{ filename: 'LuckPerms.jar', hash: 'abc' }],
+    { abc: { id: 'same', version_number: '5.5' } },
+    { abc: { id: 'same', project_id: 'luck', version_number: '5.5' } },
+  ).length, 0);
+});
+
+test('a world zip is recognized and can replace the world folder', async () => {
+  assert.equal(worldRootIn(['level.dat', 'region/r.0.0.mca']), '');
+  assert.equal(worldRootIn(['world/level.dat', 'world/region/r.0.0.mca']), 'world');
+  assert.equal(worldRootIn(['notes.txt']), null);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hotbar-world-'));
+  fs.writeFileSync(path.join(root, 'server.properties'), 'level-name=earth\n');
+  assert.equal(worldFolderName(root), 'earth');
+  const world = path.join(root, 'earth');
+  fs.mkdirSync(world);
+  fs.writeFileSync(path.join(world, 'level.dat'), 'old');
+  const packed = path.join(root, 'earth.zip');
+  const listed = parseTarListLine('-rw-rw-rw-  0 0      0           4 Nov 19 01:00 level.dat');
+  assert.equal(listed?.name, 'level.dat');
+  assert.equal(listed?.uncompressedBytes, 4);
+  const zipped = await zipFolder(root, 'earth');
+  assert.equal(zipped, 'earth.zip');
+  fs.rmSync(world, { recursive: true });
+  await unzipFile(root, 'earth.zip');
+  assert.equal(fs.readFileSync(path.join(root, 'earth', 'level.dat'), 'utf8'), 'old');
+  const replacement = fs.readFileSync(packed);
+  fs.writeFileSync(path.join(root, 'incoming.zip'), replacement);
+  await replaceWorldFolder(root, 'earth', fs.readFileSync(path.join(root, 'incoming.zip')));
+  assert.equal(fs.existsSync(path.join(root, 'earth', 'level.dat')), true);
 });
 
 test('an update without a signature is refused', () => {

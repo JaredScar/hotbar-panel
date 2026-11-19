@@ -1,7 +1,8 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { AddonHit, ModpackHit } from '@hotbar/shared';
+import type { AddonHit, AddonUpdate, ModpackHit } from '@hotbar/shared';
 import { resolveInJail } from './jail.js';
 import { downloadVerified, assertAllowedUrl } from './minecraft/net.js';
 import { run } from './minecraft/network.js';
@@ -104,6 +105,106 @@ export async function installAddon(cwd: string, projectId: string, provider: str
   return file.filename;
 }
 
+interface ModrinthVersion {
+  id?: string;
+  project_id?: string;
+  version_number?: string;
+  files?: Array<{ url?: string; filename?: string; primary?: boolean; hashes?: { sha1?: string } }>;
+}
+
+export function chooseAddonUpdates(
+  installed: Array<{ filename: string; hash: string }>,
+  current: Record<string, ModrinthVersion>,
+  latest: Record<string, ModrinthVersion>,
+): AddonUpdate[] {
+  const updates: AddonUpdate[] = [];
+  for (const file of installed) {
+    const key = file.hash.toLowerCase();
+    const have = current[key] ?? current[file.hash];
+    const next = latest[key] ?? latest[file.hash];
+    if (!have?.id || !next?.id || !next.project_id || have.id === next.id) continue;
+    updates.push({
+      filename: file.filename,
+      projectId: next.project_id,
+      installedVersion: have.version_number || have.id,
+      latestVersion: next.version_number || next.id,
+    });
+  }
+  return updates;
+}
+
+export async function checkAddonUpdates(cwd: string, provider: string, version: string): Promise<AddonUpdate[]> {
+  const slot = addonSlot(provider);
+  if (!slot) throw new Error('Vanilla does not load plugins or mods. Change the server type on the Version tab.');
+  const installed = await hashAddonJars(cwd, slot.folder);
+  if (installed.length === 0) return [];
+  const hashes = installed.map((file) => file.hash);
+  const body = { hashes, algorithm: 'sha1', loaders: slot.loaders, game_versions: version.trim() ? [version.trim()] : [] };
+  const [current, latest] = await Promise.all([
+    postJson('https://api.modrinth.com/v2/version_files', { hashes, algorithm: 'sha1' }) as Promise<Record<string, ModrinthVersion>>,
+    postJson('https://api.modrinth.com/v2/version_files/update', body) as Promise<Record<string, ModrinthVersion>>,
+  ]);
+  return chooseAddonUpdates(installed, current, latest);
+}
+
+export async function updateAddonFile(cwd: string, filename: string, provider: string, version: string, onLine: (line: string) => void): Promise<string> {
+  const slot = addonSlot(provider);
+  if (!slot) throw new Error('Vanilla does not load plugins or mods. Change the server type on the Version tab.');
+  const safe = safeJarName(filename);
+  if (!safe) throw new Error('jar name is not valid');
+  const currentPath = resolveInJail(cwd, `${slot.folder}/${safe}`);
+  if (!fs.existsSync(currentPath) || !fs.statSync(currentPath).isFile()) throw new Error('that jar is not installed');
+  const hash = await sha1File(currentPath);
+  const body = { hashes: [hash], algorithm: 'sha1', loaders: slot.loaders, game_versions: version.trim() ? [version.trim()] : [] };
+  const latest = (await postJson('https://api.modrinth.com/v2/version_files/update', body)) as Record<string, ModrinthVersion>;
+  const next = latest[hash] ?? latest[hash.toLowerCase()];
+  const file = pickAddonJar(next ? [next] : []);
+  if (!file) throw new Error(`No newer ${slot.label} file on Modrinth for ${provider} ${version}.`);
+  if (file.sha1.toLowerCase() === hash.toLowerCase()) throw new Error(`${safe} is already the newest file on Modrinth.`);
+  const dest = resolveInJail(cwd, `${slot.folder}/${file.filename}`);
+  const temp = `${dest}.hotbar-download`;
+  onLine(`Downloading ${file.filename}`);
+  try {
+    await downloadVerified(file.url, temp, { algorithm: 'sha1', expected: file.sha1 }, 80 * 1024 * 1024);
+    fs.renameSync(temp, dest);
+  } catch (error) {
+    fs.rmSync(temp, { force: true });
+    throw error;
+  }
+  if (path.basename(dest) !== safe) fs.rmSync(currentPath, { force: true });
+  onLine(`${file.filename} replaced ${safe}. Start the server to load it.`);
+  return file.filename;
+}
+
+async function hashAddonJars(cwd: string, folder: string): Promise<Array<{ filename: string; hash: string }>> {
+  let dir: string;
+  try {
+    dir = resolveInJail(cwd, folder);
+  } catch {
+    return [];
+  }
+  if (!fs.existsSync(dir)) return [];
+  const names = fs.readdirSync(dir).filter((name) => safeJarName(name)).slice(0, 40);
+  const hashed: Array<{ filename: string; hash: string }> = [];
+  for (const filename of names) {
+    const full = path.join(dir, filename);
+    const stat = fs.statSync(full);
+    if (!stat.isFile() || stat.size > 80 * 1024 * 1024) continue;
+    hashed.push({ filename, hash: await sha1File(full) });
+  }
+  return hashed;
+}
+
+function sha1File(file: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha1');
+    const stream = fs.createReadStream(file);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
 export function addonDownloadOffer(provider: string, version: string): { id: string; title: string; detail: string } {
   const slot = addonSlot(provider);
   const label = slot?.label ?? 'file';
@@ -180,9 +281,23 @@ function copyTree(source: string, cwd: string, relative: string): void {
 }
 
 async function getJson(url: string): Promise<unknown> {
+  return readJson(url);
+}
+
+async function postJson(url: string, body: unknown): Promise<unknown> {
+  return readJson(url, body);
+}
+
+async function readJson(url: string, body?: unknown): Promise<unknown> {
   const parsed = assertAllowedUrl(url);
   const response = await fetch(parsed, {
-    headers: { 'user-agent': 'Hotbar/0.1.0 (local)', accept: 'application/json' },
+    method: body === undefined ? 'GET' : 'POST',
+    headers: {
+      'user-agent': 'Hotbar/0.1.0 (local)',
+      accept: 'application/json',
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
     redirect: 'manual',
   });
   if (response.status !== 200) throw new Error(`Modrinth request failed (${response.status})`);

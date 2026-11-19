@@ -26,6 +26,13 @@ const RPC_PERMISSION: Record<string, string> = {
   'modpack.install': 'file.create',
   'addons.search': 'file.read',
   'addon.install': 'file.create',
+  'addons.updates': 'file.read',
+  'addon.update': 'file.create',
+  'files.zip': 'file.create',
+  'files.unzip': 'file.create',
+  'world.info': 'file.read',
+  'world.export': 'file.read',
+  'world.replace': 'file.create',
   'install.read': 'startup.read',
   'players.list': 'server.read',
   'players.action': 'control.console',
@@ -148,7 +155,8 @@ export class Hub {
     if (!permission) throw new PanelError(400, 'unknown request');
     const owned = this.requireAccess(userId, serverId, permission);
     const requestId = crypto.randomUUID();
-    const timeout = method === 'modpack.install' || method === 'addon.install' || method === 'backups.create' || method === 'version.change' ? 10 * 60 * 1000 : 20_000;
+    const slow = new Set(['modpack.install', 'addon.install', 'addon.update', 'backups.create', 'version.change', 'files.zip', 'files.unzip', 'world.export', 'world.replace']);
+    const timeout = slow.has(method) ? 10 * 60 * 1000 : 20_000;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.rpcWaiters.delete(requestId);

@@ -129,6 +129,13 @@ export class ServerManager {
     this.system(this.must(id), line);
   }
 
+  alert(id: string, message: string): void {
+    const text = message.replace(/\s+/g, ' ').slice(0, 180);
+    this.onAlert?.(text);
+    const server = this.servers.get(id);
+    if (server) this.system(server, `Hotbar alert: ${text}`);
+  }
+
   setPort(id: string, port: number): void {
     const server = this.must(id);
     if (server.state !== 'offline') throw new HttpError(409, 'stop the server before changing its port');
@@ -334,14 +341,14 @@ export class ServerManager {
     if (lived > 10_000) server.crashCount = 0;
     server.crashCount += 1;
     if (server.crashCount > MAX_CRASHES) {
-      this.system(server, `stopped restarting after ${MAX_CRASHES} crashes`);
-      this.onAlert?.(`${server.def.name} stopped restarting after ${MAX_CRASHES} crashes`);
+      this.alert(server.def.id, `${server.def.name} stopped restarting after ${MAX_CRASHES} crashes`);
       return;
     }
-    this.system(server, `restarting in 2s (crash ${server.crashCount})`);
+    this.alert(server.def.id, `${server.def.name} crashed and is restarting (${server.crashCount} of ${MAX_CRASHES})`);
     setTimeout(() => {
       void this.start(server).catch((error: unknown) => {
-        this.system(server, `restart failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+        const message = error instanceof Error ? error.message : 'unknown error';
+        this.alert(server.def.id, `${server.def.name} could not restart: ${message}`);
       });
     }, 2000);
   }

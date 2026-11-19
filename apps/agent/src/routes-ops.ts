@@ -10,13 +10,15 @@ import { assertDownloadAccepted } from './downloads.js';
 import { eggToTemplate } from './eggs.js';
 import { HttpError } from './errors.js';
 import { resolveExecutable } from './executable.js';
+import { createFolderZip, replaceWorldFolder, unzipFile, worldDirectory, worldFolderName, zipFolder } from './archive.js';
 import { listFiles, makeDirectory, readFileText, removePath, renamePath, saveUpload, writeFileText } from './files.js';
 import type { ServerManager } from './manager.js';
 import { createServerBackup, restoreServerBackup } from './minecraft/backup.js';
-import { addonDownloadOffer, installAddon, installModpack, searchAddons, searchModpacks } from './modrinth.js';
+import { addonDownloadOffer, checkAddonUpdates, installAddon, installModpack, searchAddons, searchModpacks, updateAddonFile } from './modrinth.js';
 import { readSettings, writeSettings } from './settings.js';
 
 const CRON = /^(\*|[0-9]{1,2}(,[0-9]{1,2})*)(\s+(\*|[0-9]{1,2}(,[0-9]{1,2})*)){4}$/;
+const WORLD_ZIP_BYTES = 256 * 1024 * 1024;
 const STEAM_APPS: Record<string, { name: string; windows: string; linux: string }> = {
   '2394010': { name: 'Palworld', windows: 'PalServer.exe', linux: 'PalServer' },
   '258550': { name: 'Rust', windows: 'RustDedicated.exe', linux: 'RustDedicated' },
@@ -29,6 +31,10 @@ export function registerOps(
   manager: ServerManager,
   guard: (request: FastifyRequest, permission: Permission) => void,
 ): void {
+  app.addContentTypeParser('application/zip', { parseAs: 'buffer', bodyLimit: WORLD_ZIP_BYTES }, (_request, body, done) => {
+    done(null, body);
+  });
+
   app.get('/api/setup', async (request) => {
     guard(request, 'server.read');
     const settings = readSettings(config.dataDir);
@@ -98,6 +104,36 @@ export function registerOps(
       return { ok: true, filename };
     } catch (error) {
       throw new HttpError(400, error instanceof Error ? error.message : 'install failed');
+    }
+  });
+
+  app.get('/api/servers/:id/addon-updates', async (request) => {
+    guard(request, 'file.read');
+    const params = request.params as { id: string };
+    const server = mustServer(manager, params.id);
+    const install = readInstall(db, params.id);
+    if (!install) throw new HttpError(400, 'this server has no Minecraft version yet');
+    try {
+      return await checkAddonUpdates(server.cwd, install.provider, install.version);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : 'update check failed');
+    }
+  });
+
+  app.post('/api/servers/:id/addon-updates', async (request) => {
+    guard(request, 'file.create');
+    const params = request.params as { id: string };
+    const server = mustServer(manager, params.id);
+    if (server.state !== 'offline') throw new HttpError(409, 'stop the server before updating');
+    const install = readInstall(db, params.id);
+    if (!install) throw new HttpError(400, 'this server has no Minecraft version yet');
+    const filename = (request.body as { filename?: string }).filename ?? '';
+    assertDownloadAccepted(request.body, [addonDownloadOffer(install.provider, install.version)]);
+    try {
+      const updated = await updateAddonFile(server.cwd, filename, install.provider, install.version, (line) => manager.note(server.id, line));
+      return { ok: true, filename: updated };
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : 'update failed');
     }
   });
 
@@ -207,6 +243,61 @@ export function registerOps(
     if (typeof body?.name !== 'string' || typeof body.base64 !== 'string') throw new HttpError(400, 'name and base64 are required');
     saveUpload(cwdOf(manager, params.id), body.directory ?? '', body.name, body.base64);
     return { ok: true };
+  });
+
+  app.post('/api/servers/:id/files/zip', async (request) => {
+    guard(request, 'file.create');
+    const params = request.params as { id: string };
+    const body = request.body as { path?: string };
+    if (typeof body?.path !== 'string') throw new HttpError(400, 'path is required');
+    return { path: await zipFolder(cwdOf(manager, params.id), body.path) };
+  });
+
+  app.post('/api/servers/:id/files/unzip', async (request) => {
+    guard(request, 'file.create');
+    const params = request.params as { id: string };
+    const body = request.body as { path?: string };
+    if (typeof body?.path !== 'string') throw new HttpError(400, 'path is required');
+    return { path: await unzipFile(cwdOf(manager, params.id), body.path) };
+  });
+
+  app.get('/api/servers/:id/world', async (request) => {
+    guard(request, 'file.read');
+    const params = request.params as { id: string };
+    mustServer(manager, params.id);
+    return { folder: worldFolderName(cwdOf(manager, params.id)) };
+  });
+
+  app.get('/api/servers/:id/world/archive', async (request, reply) => {
+    guard(request, 'file.read');
+    const params = request.params as { id: string };
+    const server = mustServer(manager, params.id);
+    if (server.state !== 'offline') throw new HttpError(409, 'stop the server before downloading the world');
+    const world = worldDirectory(server.cwd);
+    const file = await createFolderZip(world.folder);
+    reply.header('content-type', 'application/zip');
+    reply.header('content-disposition', `attachment; filename="${world.name}.zip"`);
+    const stream = fs.createReadStream(file);
+    stream.on('close', () => fs.rmSync(file, { force: true }));
+    stream.on('error', () => fs.rmSync(file, { force: true }));
+    return reply.send(stream);
+  });
+
+  app.post('/api/servers/:id/world', async (request) => {
+    guard(request, 'file.create');
+    const params = request.params as { id: string };
+    const server = mustServer(manager, params.id);
+    if (server.state !== 'offline') throw new HttpError(409, 'stop the server before replacing the world');
+    const body = request.body;
+    const bytes = Buffer.isBuffer(body)
+      ? body
+      : Buffer.from(typeof (body as { base64?: string })?.base64 === 'string' ? (body as { base64: string }).base64 : '', 'base64');
+    if (bytes.length === 0 || bytes.length > WORLD_ZIP_BYTES) throw new HttpError(400, 'world zip has to be under 256 MB');
+    const world = worldDirectory(server.cwd);
+    await createServerBackup(config.dataDir, server.id, server.cwd);
+    await replaceWorldFolder(server.cwd, world.name, bytes);
+    manager.note(server.id, `replaced world folder ${world.name}`);
+    return { ok: true, folder: world.name };
   });
 
   app.delete('/api/servers/:id/files', async (request) => {

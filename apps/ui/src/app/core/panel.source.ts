@@ -16,6 +16,7 @@ import type {
   McPlayerAction,
   McPlayers,
   AddonHit,
+  AddonUpdate,
   ModpackHit,
   PowerAction,
   Reachability,
@@ -235,6 +236,37 @@ export class PanelDataSource extends DataSource {
   override async installAddon(id: string, projectId: string, acceptDownloads: string[]): Promise<void> {
     await this.session.request('POST', `/api/servers/${id}/addons`, { projectId, acceptDownloads });
   }
+
+  override checkAddonUpdates(id: string): Promise<AddonUpdate[]> {
+    return this.session.request('GET', `/api/servers/${id}/addon-updates`);
+  }
+
+  override async updateAddon(id: string, filename: string, acceptDownloads: string[]): Promise<void> {
+    await this.session.request('POST', `/api/servers/${id}/addon-updates`, { filename, acceptDownloads });
+  }
+
+  override async zipPath(id: string, filePath: string): Promise<void> {
+    await this.session.request('POST', `/api/servers/${id}/files/zip`, { path: filePath });
+  }
+
+  override async unzipPath(id: string, filePath: string): Promise<void> {
+    await this.session.request('POST', `/api/servers/${id}/files/unzip`, { path: filePath });
+  }
+
+  override worldInfo(id: string): Promise<{ folder: string }> {
+    return this.session.request('GET', `/api/servers/${id}/world`);
+  }
+
+  override async downloadWorld(id: string): Promise<{ name: string; bytes: Uint8Array }> {
+    const packed = await this.session.request<{ name?: string; base64?: string }>('GET', `/api/servers/${id}/world/archive`);
+    if (!packed.base64) throw new Error('The world zip was empty.');
+    return { name: packed.name || 'world.zip', bytes: decodeBase64(packed.base64) };
+  }
+
+  override async replaceWorld(id: string, bytes: Uint8Array): Promise<void> {
+    if (bytes.byteLength > 32 * 1024 * 1024) throw new Error('This world zip is over 32 MB. Replace it on the machine, or use SFTP.');
+    await this.session.request('POST', `/api/servers/${id}/world`, { base64: encodeBase64(bytes) });
+  }
   override activity(serverId: string): Promise<ActivityEntry[]> {
     return this.session.request('GET', `/api/servers/${serverId}/activity`);
   }
@@ -351,4 +383,20 @@ export class PanelDataSource extends DataSource {
       return next;
     });
   }
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const size = 0x8000;
+  for (let index = 0; index < bytes.length; index += size) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + size));
+  }
+  return btoa(binary);
+}
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
 }

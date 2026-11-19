@@ -52,7 +52,10 @@
           Upload
           <input class="hidden" type="file" (change)="onUpload($event)" />
         </label>
-        <span class="text-sm text-faint">Right-click a file, or use More, for rename, copy, and delete.</span>
+        @if (canOpenFolder()) {
+          <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="openInFolder()">Open folder</button>
+        }
+        <span class="text-sm text-faint">Right-click a file, or use More, for rename, zip, and delete.</span>
       </div>
       @if (confirming(); as pending) {
         <p class="mb-3 text-sm">Delete {{ pending.name }}{{ pending.directory ? ' and everything inside it' : '' }}?
@@ -85,9 +88,18 @@
         <ul class="fixed z-50 w-44 rounded border border-line bg-surface py-1 text-sm shadow-lg" role="menu" [style.left.px]="current.x" [style.top.px]="current.y">
           <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" (click)="openEntry(current.entry)">{{ current.entry.directory ? 'Open' : 'Edit' }}</button></li>
           <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" (click)="startRename(current.entry)">Rename</button></li>
+          @if (current.entry.directory) {
+            <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" (click)="zipEntry(current.entry)">Zip</button></li>
+          }
           @if (!current.entry.directory) {
             <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" (click)="duplicate(current.entry)">Duplicate</button></li>
             <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" (click)="download(current.entry)">Download</button></li>
+            @if (current.entry.name.toLowerCase().endsWith('.zip')) {
+              <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" (click)="unzipEntry(current.entry)">Unzip</button></li>
+            }
+          }
+          @if (canOpenFolder()) {
+            <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" (click)="openInFolder(current.entry.path)">Show in folder</button></li>
           }
           <li><button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-raised" (click)="copyPath(current.entry)">Copy path</button></li>
           <li><button type="button" class="block w-full px-3 py-1.5 text-left text-danger hover:bg-raised" (click)="askRemove(current.entry)">Delete</button></li>
@@ -258,11 +270,18 @@
             <li class="px-3 py-4 text-sm text-faint">No {{ addonFolder() === 'mods' ? 'mods' : 'plugins' }} on Modrinth match this server version.</li>
           }
         </ul>
-        <p class="mb-2 text-sm text-faint">Installed {{ addonFolder() === 'mods' ? 'mods' : 'plugins' }}. Disable renames a jar to .disabled. Stop the server before installing.</p>
+        <div class="mb-2 flex flex-wrap items-center gap-3">
+          <p class="text-sm text-faint">Installed {{ addonFolder() === 'mods' ? 'mods' : 'plugins' }}. Disable renames a jar to .disabled. Stop the server before installing or updating.</p>
+          <button type="button" class="h-8 rounded border border-line px-2 text-sm" [disabled]="busy()" (click)="checkUpdates()">Check for updates</button>
+        </div>
         <ul class="mb-6 divide-y divide-line rounded border border-line">
           @for (entry of files(); track entry.path) {
             <li class="flex items-center gap-3 px-3 py-2 text-sm">
               <span class="flex-1">{{ entry.name }}</span>
+              @if (updateFor(entry.name); as update) {
+                <span class="text-faint">{{ update.installedVersion }} → {{ update.latestVersion }}</span>
+                <button type="button" class="text-accent" [disabled]="busy()" (click)="updateAddon(entry.name)">Update</button>
+              }
               @if (!entry.directory) {
                 <button type="button" (click)="togglePlugin(entry)">{{ entry.name.endsWith('.disabled') ? 'Enable' : 'Disable' }}</button>
               }
@@ -288,8 +307,18 @@
       }
     }
     @case ('world') {
-      <p class="mb-2 text-sm text-faint">Reset takes a backup, then deletes the world folder. The server has to be stopped.</p>
-      <button type="button" class="mb-3 h-8 rounded border border-line px-3 text-sm" [disabled]="busy()" (click)="resetWorld()">Back up and reset world</button>
+      <p class="mb-2 text-sm text-faint">Download {{ worldFolder() }} as a zip, or replace it with a zip that contains level.dat. The server has to be stopped. Replace and reset each write a backup first.</p>
+      @if (dataRemote()) {
+        <p class="mb-2 text-sm text-faint">From the online panel, that zip has to be 32 MB or smaller. Larger worlds can be moved on the machine, or with SFTP.</p>
+      }
+      <div class="mb-3 flex flex-wrap gap-2">
+        <button type="button" class="h-8 rounded border border-line px-3 text-sm" [disabled]="busy()" (click)="downloadWorld()">Download world</button>
+        <label class="h-8 cursor-pointer rounded border border-line px-3 text-sm leading-8">
+          Replace world
+          <input class="hidden" type="file" accept=".zip,application/zip" (change)="onWorldUpload($event)" [disabled]="busy()" />
+        </label>
+        <button type="button" class="h-8 rounded border border-line px-3 text-sm" [disabled]="busy()" (click)="resetWorld()">Back up and reset world</button>
+      </div>
       <ul class="divide-y divide-line rounded border border-line">
         @for (entry of files(); track entry.path) {
           <li class="px-3 py-2 text-sm">{{ entry.name }}</li>

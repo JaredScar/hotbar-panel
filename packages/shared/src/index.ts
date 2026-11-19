@@ -17,6 +17,6 @@ export type { GameId, McProviderId, McVersion, McGamemode, McDifficulty, McCreat
 export type { PropertyChoice, PropertyField, PropertyKind } from './server-properties.js';
 export { PROPERTY_FIELDS, PROPERTY_GROUPS, checkPropertyValue, propertyField } from './server-properties.js';
 export { GAMES, MC_PROVIDERS } from './minecraft.js';
-export type { FileEntry, FileContent, BackupInfo, ScheduleInfo, ModpackHit, AddonHit, SetupStatus } from './ops.js';
+export type { FileEntry, FileContent, BackupInfo, ScheduleInfo, ModpackHit, AddonHit, AddonUpdate, SetupStatus } from './ops.js';
 export type { McPlayer, McPlayers, McPlayerAction } from './players.js';
 export { isPlayerName, parseOnlineList, parsePresence, plainLog } from './players.js';

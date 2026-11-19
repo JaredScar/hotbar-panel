@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld('hotbar', {
     ipcRenderer.on('update:progress', wrapped);
     return () => ipcRenderer.removeListener('update:progress', wrapped);
   },
+  openFolder: (serverId, relative) => ipcRenderer.invoke('folder:open', { serverId, relative }),
 });

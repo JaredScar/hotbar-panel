@@ -26,6 +26,7 @@ declare global {
       checkForUpdate?: () => Promise<UpdateStatus>;
       installUpdate?: () => Promise<{ replacing: boolean }>;
       onUpdateProgress?: (listener: (progress: UpdateProgress) => void) => () => void;
+      openFolder?: (serverId: string, relative: string) => Promise<{ ok: true }>;
     };
   }
 }

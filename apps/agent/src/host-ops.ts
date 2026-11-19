@@ -8,14 +8,16 @@ import { createNamedDatabase, databasesFor, deleteNamedDatabase, revealDatabaseP
 import { acceptedDownloadIds, assertDownloadAccepted, databaseDownloadPlan } from './downloads.js';
 import { deleteSchedule, insertSchedule, listActivity, listSchedules, readInstall } from './db.js';
 import { HttpError } from './errors.js';
+import { createFolderZip, replaceWorldFolder, unzipFile, worldDirectory, worldFolderName, zipFolder } from './archive.js';
 import { listFiles, makeDirectory, readFileText, removePath, renamePath, saveUpload, writeFileText } from './files.js';
 import type { ServerManager } from './manager.js';
 import { createServerBackup, restoreServerBackup } from './minecraft/backup.js';
 import { listProviderVersions } from './minecraft/providers.js';
 import { actOnPlayer, collectPlayers } from './minecraft/players.js';
-import { addonDownloadOffer, installAddon, installModpack, searchAddons, searchModpacks } from './modrinth.js';
+import { addonDownloadOffer, checkAddonUpdates, installAddon, installModpack, searchAddons, searchModpacks, updateAddonFile } from './modrinth.js';
 
 const CRON = /^(\*|[0-9]{1,2}(,[0-9]{1,2})*)(\s+(\*|[0-9]{1,2}(,[0-9]{1,2})*)){4}$/;
+const PANEL_WORLD_BYTES = 32 * 1024 * 1024;
 
 export async function runHostOp(
   config: AgentConfig,
@@ -56,6 +58,44 @@ export async function runHostOp(
   if (method === 'files.delete') {
     removePath(server.cwd, text('path'));
     return { ok: true };
+  }
+  if (method === 'files.zip') return { path: await zipFolder(server.cwd, text('path')) };
+  if (method === 'files.unzip') return { path: await unzipFile(server.cwd, text('path')) };
+  if (method === 'addons.updates') {
+    const install = readInstall(db, server.id);
+    if (!install) throw new HttpError(400, 'this server has no Minecraft version yet');
+    return checkAddonUpdates(server.cwd, install.provider, install.version);
+  }
+  if (method === 'addon.update') {
+    if (server.state !== 'offline') throw new HttpError(409, 'stop the server before updating');
+    const install = readInstall(db, server.id);
+    if (!install) throw new HttpError(400, 'this server has no Minecraft version yet');
+    assertDownloadAccepted(body, [addonDownloadOffer(install.provider, install.version)]);
+    const filename = await updateAddonFile(server.cwd, text('filename'), install.provider, install.version, (line) => manager.note(server.id, line));
+    return { ok: true, filename };
+  }
+  if (method === 'world.info') return { folder: worldFolderName(server.cwd) };
+  if (method === 'world.export') {
+    if (server.state !== 'offline') throw new HttpError(409, 'stop the server before downloading the world');
+    const world = worldDirectory(server.cwd);
+    const file = await createFolderZip(world.folder);
+    try {
+      const bytes = fs.readFileSync(file);
+      if (bytes.length > PANEL_WORLD_BYTES) throw new HttpError(413, 'This world is larger than 32 MB. Download it on the machine, or use SFTP.');
+      return { name: `${world.name}.zip`, base64: bytes.toString('base64') };
+    } finally {
+      fs.rmSync(file, { force: true });
+    }
+  }
+  if (method === 'world.replace') {
+    if (server.state !== 'offline') throw new HttpError(409, 'stop the server before replacing the world');
+    const bytes = Buffer.from(text('base64'), 'base64');
+    if (bytes.length === 0 || bytes.length > PANEL_WORLD_BYTES) throw new HttpError(400, 'This world zip has to be under 32 MB from the online panel.');
+    const world = worldDirectory(server.cwd);
+    await createServerBackup(config.dataDir, server.id, server.cwd);
+    await replaceWorldFolder(server.cwd, world.name, bytes);
+    manager.note(server.id, `replaced world folder ${world.name}`);
+    return { ok: true, folder: world.name };
   }
   if (method === 'backups.list') return listBackups(config.dataDir, server.id);
   if (method === 'backups.create') {

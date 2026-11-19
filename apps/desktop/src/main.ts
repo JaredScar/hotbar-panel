@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, Menu, Tray, ipcMain, session, type WebContents } from 'electron';
+import { app, BrowserWindow, Menu, Notification, Tray, ipcMain, session, shell, type WebContents } from 'electron';
 import { defaultDataDir } from '@hotbar/shared/node';
 import { appIcon, trayIcon } from './icon.js';
 import { handOffInstaller } from './install-update.js';
@@ -60,10 +60,13 @@ async function boot(): Promise<void> {
   ipcMain.handle('bootstrap', () => ({
     agentUrl,
     token,
-    capabilities: { tray: true, notifications: false, openFolder: false },
+    capabilities: { tray: true, notifications: true, openFolder: true },
   }));
   ipcMain.handle('update:check', () => checkForUpdate());
   ipcMain.handle('update:install', (event) => installUpdate(event.sender));
+  ipcMain.handle('folder:open', (_event, payload: { serverId?: string; relative?: string }) => openServerFolder(payload ?? {}));
+  app.setAppUserModelId('com.hotbar.desktop');
+  watchAlerts();
   if (!(await agentIsUp())) ensureAgent();
   await waitForUrl(uiUrl, 60_000);
   createWindow();
@@ -228,7 +231,7 @@ function ensureAgent(): void {
     stdio: 'ignore',
     windowsHide: true,
     shell: false,
-    env: entry.env,
+    env: { ...entry.env, HOTBAR_DESKTOP: '1' },
   });
   agentChild = child;
   child.on('exit', () => {
@@ -271,6 +274,69 @@ async function agentIsUp(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+let alertSocket: WebSocket | null = null;
+const recentAlerts = new Set<string>();
+
+function watchAlerts(): void {
+  if (quitting || alertSocket) return;
+  let socket: WebSocket;
+  try {
+    socket = new WebSocket(`${agentUrl.replace(/^http/, 'ws')}/api/ws?access_token=${encodeURIComponent(token)}`);
+  } catch {
+    setTimeout(watchAlerts, 2000);
+    return;
+  }
+  alertSocket = socket;
+  socket.addEventListener('message', (event) => {
+    try {
+      const body = JSON.parse(String(event.data)) as { type?: string; line?: { line?: string } };
+      const text = body.type === 'server.log' ? body.line?.line ?? '' : '';
+      if (!text.startsWith('Hotbar alert: ')) return;
+      showAlert(text.slice('Hotbar alert: '.length));
+    } catch {
+      // ignore a malformed agent event
+    }
+  });
+  socket.addEventListener('close', () => {
+    if (alertSocket === socket) alertSocket = null;
+    if (!quitting) setTimeout(watchAlerts, 2000);
+  });
+  socket.addEventListener('error', () => socket.close());
+}
+
+function showAlert(body: string): void {
+  const text = body.trim().slice(0, 180);
+  if (!text || recentAlerts.has(text) || !Notification.isSupported()) return;
+  recentAlerts.add(text);
+  setTimeout(() => recentAlerts.delete(text), 10_000);
+  const note = new Notification({ title: 'Hotbar', body: text, icon: appIcon() });
+  note.on('click', () => {
+    windowRef?.show();
+    windowRef?.focus();
+  });
+}
+
+async function openServerFolder(payload: { serverId?: string; relative?: string }): Promise<{ ok: true }> {
+  const serverId = payload.serverId ?? '';
+  const relative = (payload.relative ?? '').replaceAll('\\', '/');
+  if (!/^[0-9a-f-]{36}$/i.test(serverId)) throw new Error('server not found');
+  if (relative.includes('\0') || relative.startsWith('/') || /^[A-Za-z]:/.test(relative) || relative.split('/').includes('..')) {
+    throw new Error('That folder is outside the server.');
+  }
+  const response = await fetch(`${agentUrl}/api/servers`, { headers: { authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error('The agent did not answer.');
+  const servers = (await response.json()) as Array<{ id: string; cwd: string }>;
+  const server = servers.find((item) => item.id === serverId);
+  if (!server?.cwd) throw new Error('server not found');
+  const root = path.resolve(server.cwd);
+  const target = path.resolve(root, relative);
+  const fromRoot = path.relative(root, target);
+  if (fromRoot.startsWith('..') || path.isAbsolute(fromRoot)) throw new Error('That folder is outside the server.');
+  const error = await shell.openPath(target);
+  if (error) throw new Error('Could not open that folder.');
+  return { ok: true };
 }
 
 async function listServers(): Promise<Array<{ id: string; name: string; state: string }>> {

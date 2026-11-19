@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { Catch, Controller, Delete, Get, HttpException, Module, Post, Req, Res, type ArgumentsHost, type DynamicModule, type ExceptionFilter } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import type { Request, Response } from 'express';
+import { json, type Request, type Response } from 'express';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
@@ -258,6 +258,41 @@ class ApiController {
     return this.hub.rpc(this.user(request).id, param(request), 'addon.install', request.body ?? {});
   }
 
+  @Get('servers/:id/addon-updates')
+  addonUpdates(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'addons.updates', {});
+  }
+
+  @Post('servers/:id/addon-updates')
+  updateAddon(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'addon.update', request.body ?? {});
+  }
+
+  @Post('servers/:id/files/zip')
+  zipFile(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'files.zip', request.body ?? {});
+  }
+
+  @Post('servers/:id/files/unzip')
+  unzipFile(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'files.unzip', request.body ?? {});
+  }
+
+  @Get('servers/:id/world')
+  world(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'world.info', {});
+  }
+
+  @Get('servers/:id/world/archive')
+  worldArchive(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'world.export', {});
+  }
+
+  @Post('servers/:id/world')
+  replaceWorld(@Req() request: Request): Promise<unknown> {
+    return this.hub.rpc(this.user(request).id, param(request), 'world.replace', request.body ?? {});
+  }
+
   @Get('servers/:id/databases/plan')
   databasePlan(@Req() request: Request): Promise<unknown> {
     return this.hub.rpc(this.user(request).id, param(request), 'databases.plan', {});
@@ -433,7 +468,8 @@ class PanelModule {
 export async function createPanel(options: { dataDir: string; host: string; port: number }): Promise<RunningPanel> {
   const store = new PanelStore(options.dataDir);
   const hub = new Hub(store);
-  const app = await NestFactory.create(PanelModule.forRoot(store, hub), { logger: false });
+  const app = await NestFactory.create(PanelModule.forRoot(store, hub), { logger: false, bodyParser: false });
+  app.use(json({ limit: '48mb' }));
   app.useGlobalFilters(new PanelFilter());
   app.enableCors({
     origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {

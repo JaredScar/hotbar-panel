@@ -14,6 +14,7 @@ import type {
   McPlayerAction,
   McPlayers,
   AddonHit,
+  AddonUpdate,
   ModpackHit,
   PowerAction,
   Reachability,
@@ -106,6 +107,13 @@ export abstract class DataSource {
   abstract installModpack(id: string, projectId: string, acceptDownloads: string[]): Promise<void>;
   abstract searchAddons(id: string, query: string): Promise<AddonHit[]>;
   abstract installAddon(id: string, projectId: string, acceptDownloads: string[]): Promise<void>;
+  abstract checkAddonUpdates(id: string): Promise<AddonUpdate[]>;
+  abstract updateAddon(id: string, filename: string, acceptDownloads: string[]): Promise<void>;
+  abstract zipPath(id: string, path: string): Promise<void>;
+  abstract unzipPath(id: string, path: string): Promise<void>;
+  abstract worldInfo(id: string): Promise<{ folder: string }>;
+  abstract downloadWorld(id: string): Promise<{ name: string; bytes: Uint8Array }>;
+  abstract replaceWorld(id: string, bytes: Uint8Array): Promise<void>;
   abstract activity(serverId: string): Promise<ActivityEntry[]>;
   abstract currentInstall(id: string): Promise<{ provider: string; version: string; javaMajor: number } | null>;
   abstract changeVersion(id: string, provider: string, version: string, acceptDownloads: string[]): Promise<{ provider: string; version: string }>;

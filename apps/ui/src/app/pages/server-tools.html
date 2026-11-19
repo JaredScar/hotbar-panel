@@ -1,4 +1,10 @@
-<section class="min-h-0 flex-1 overflow-auto px-6 py-5">
+<section
+  class="min-h-0 flex-1 px-6 py-5"
+  [class.overflow-auto]="!editingFile()"
+  [class.flex]="editingFile()"
+  [class.flex-col]="editingFile()"
+  [class.overflow-hidden]="editingFile()"
+>
   @if (error()) {
     <p class="mb-3 text-sm text-danger">{{ error() }}</p>
   }
@@ -8,6 +14,33 @@
 
   @switch (tool()) {
     @case ('files') {
+      @if (content(); as file) {
+        <div class="flex min-h-0 flex-1 flex-col">
+          <div class="mb-3 flex flex-wrap items-center gap-2">
+            <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="closeEditor()">Back to files</button>
+            <h2 class="font-mono text-sm font-medium">/{{ file.path }}</h2>
+            <span class="text-sm text-faint">{{ languageLabel(file.path) }}</span>
+            @if (dirty()) {
+              <span class="text-sm text-starting">Unsaved</span>
+            }
+            @if (!file.binary) {
+              <button type="button" class="ml-auto h-8 rounded bg-accent px-3 text-sm text-white disabled:opacity-40" [disabled]="busy() || !dirty()" (click)="saveText()">{{ busy() ? 'Saving…' : 'Save' }}</button>
+            }
+          </div>
+          @if (leaving()) {
+            <p class="mb-3 text-sm">This file has unsaved changes.
+              <button type="button" class="ml-2 text-danger" (click)="discardAndLeave()">Discard</button>
+              <button type="button" class="ml-2" (click)="keepEditing()">Keep editing</button>
+            </p>
+          }
+          @if (file.binary) {
+            <p class="text-sm text-faint">This file is binary ({{ formatBytes(file.size) }}). Upload a replacement instead of editing it here.</p>
+          } @else {
+            <app-code-editor class="min-h-0 flex-1" [fill]="true" [value]="draft()" [filename]="file.path" (changed)="draft.set($event)" (save)="saveText()" />
+            <p class="mt-2 text-sm text-faint">Ctrl+S saves too.</p>
+          }
+        </div>
+      } @else {
       <div class="mb-3 flex flex-wrap items-center gap-2">
         <button type="button" class="h-8 rounded border border-line px-2 text-sm" (click)="up()" [disabled]="!folder()">Up</button>
         <span class="font-mono text-sm text-faint">/{{ folder() }}</span>
@@ -21,12 +54,6 @@
         </label>
         <span class="text-sm text-faint">Right-click a file, or use More, for rename, copy, and delete.</span>
       </div>
-      @if (leaving()) {
-        <p class="mb-3 text-sm">This file has unsaved changes.
-          <button type="button" class="ml-2 text-danger" (click)="discardAndLeave()">Discard</button>
-          <button type="button" class="ml-2" (click)="keepEditing()">Keep editing</button>
-        </p>
-      }
       @if (confirming(); as pending) {
         <p class="mb-3 text-sm">Delete {{ pending.name }}{{ pending.directory ? ' and everything inside it' : '' }}?
           <button type="button" class="ml-2 text-danger" (click)="confirmRemove()">Delete</button>
@@ -52,24 +79,6 @@
           <li class="px-3 py-4 text-sm text-faint">This folder is empty.</li>
         }
       </ul>
-      @if (content(); as file) {
-        <div class="mt-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <h2 class="font-mono text-sm font-medium">/{{ file.path }}</h2>
-            <span class="text-sm text-faint">{{ languageLabel(file.path) }}</span>
-            @if (dirty()) {
-              <span class="text-sm text-starting">Unsaved</span>
-            }
-            <button type="button" class="ml-auto text-sm text-faint" (click)="closeEditor()">Close</button>
-          </div>
-          @if (file.binary) {
-            <p class="mt-2 text-sm text-faint">This file is binary ({{ formatBytes(file.size) }}). Upload a replacement instead of editing it here.</p>
-          } @else {
-            <app-code-editor class="mt-2" [value]="draft()" [filename]="file.path" (changed)="draft.set($event)" (save)="saveText()" />
-            <button type="button" class="mt-2 h-8 rounded bg-accent px-3 text-sm text-white" [disabled]="busy() || !dirty()" (click)="saveText()">{{ busy() ? 'Saving…' : 'Save' }}</button>
-            <span class="ml-2 text-sm text-faint">Ctrl+S saves too.</span>
-          }
-        </div>
       }
       @if (menu(); as current) {
         <div class="fixed inset-0 z-40" (click)="closeMenu()" (contextmenu)="closeMenu(); $event.preventDefault()"></div>
@@ -319,9 +328,9 @@
       } @else {
         <p class="text-sm text-faint">No Minecraft install is recorded for this server.</p>
       }
-      <form class="mt-4 grid max-w-md gap-2" (submit)="applyVersion($event)">
+      <form class="mt-4 grid max-w-xl gap-3" (submit)="applyVersion($event)">
         <p class="text-sm text-faint">Changing the version writes a backup first, then installs into this folder. Stop the server before you continue. A downgrade can break the world.</p>
-        <select class="h-9 rounded border border-line bg-canvas px-2" [value]="nextProvider()" (change)="nextProvider.set($any($event.target).value)">
+        <select class="h-9 rounded border border-line bg-canvas px-2" [value]="nextProvider()" (change)="chooseProvider($any($event.target).value)">
           <option value="paper">Paper</option>
           <option value="vanilla">Vanilla</option>
           <option value="purpur">Purpur</option>
@@ -331,8 +340,55 @@
           <option value="forge">Forge</option>
           <option value="neoforge">NeoForge</option>
         </select>
-        <input class="h-9 rounded border border-line bg-canvas px-2" placeholder="Version, for example 26.3" [value]="nextVersion()" (input)="nextVersion.set($any($event.target).value)" />
-        <button type="submit" class="h-9 w-fit rounded bg-accent px-3 text-sm text-white" [disabled]="busy()">Change version</button>
+        @if (nextProvider() === 'spigot') {
+          <p class="rounded border border-starting/40 bg-starting/10 px-3 py-2 text-sm">Spigot is compiled on this machine. The first install can take several minutes, and Git has to be installed.</p>
+        }
+        <div class="flex flex-wrap items-center gap-3">
+          <label class="flex items-center gap-2 text-sm text-faint">
+            <input type="checkbox" [checked]="snapshots()" (change)="toggleSnapshots()" />
+            Show snapshots and release candidates
+          </label>
+          <input class="h-9 min-w-48 flex-1 rounded border border-line bg-canvas px-2" type="search" placeholder="Find a version" [value]="versionQuery()" (input)="versionQuery.set($any($event.target).value)" />
+        </div>
+        @if (loadingVersions()) {
+          <p class="text-sm text-faint">Loading versions…</p>
+        } @else if (versionError()) {
+          <div class="rounded border border-danger/40 bg-danger/10 px-3 py-3 text-sm text-danger">
+            <p>{{ versionError() }}</p>
+            <button type="button" class="mt-2 h-8 rounded border border-danger/40 px-2 text-ink" (click)="loadVersionChoices()">Try again</button>
+          </div>
+        } @else {
+          <div class="max-h-80 overflow-auto rounded border border-line">
+            @if (visibleVersions().length === 0) {
+              <p class="px-3 py-6 text-sm text-faint">No versions match that search.</p>
+            }
+            @for (item of visibleVersions(); track item.id; let first = $first) {
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-3 border-b border-l-2 border-line px-3 py-2.5 text-left last:border-b-0"
+                [class.border-l-accent]="nextVersion() === item.id"
+                [class.bg-raised]="nextVersion() === item.id"
+                [class.border-l-transparent]="nextVersion() !== item.id"
+                [class.bg-surface]="nextVersion() !== item.id"
+                (click)="nextVersion.set(item.id)"
+              >
+                <span class="font-mono text-sm">{{ item.id }}</span>
+                <span class="flex items-center gap-2 text-xs">
+                  @if (installedChoice(item.id)) {
+                    <span class="rounded-full bg-running/15 px-2 py-0.5 font-medium text-running">Installed</span>
+                  } @else if (first && !versionQuery() && item.stable) {
+                    <span class="rounded-full bg-accent/15 px-2 py-0.5 font-medium text-accent">Latest</span>
+                  }
+                  @if (!item.stable) {
+                    <span class="text-faint">Unstable</span>
+                  }
+                </span>
+              </button>
+            }
+          </div>
+          <p class="text-xs text-faint">{{ visibleVersions().length }} of {{ versionChoices().length }} versions. Newest is at the top.</p>
+        }
+        <button type="submit" class="h-9 w-fit rounded bg-accent px-3 text-sm text-white disabled:opacity-40" [disabled]="busy() || loadingVersions() || !nextVersion()">{{ busy() ? 'Installing…' : 'Change version' }}</button>
       </form>
     }
     @case ('databases') {

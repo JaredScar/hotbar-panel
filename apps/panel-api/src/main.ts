@@ -307,6 +307,15 @@ class ApiController {
     return this.hub.rpc(this.user(request).id, param(request), 'install.read', {});
   }
 
+  @Get('servers/:id/versions')
+  versions(@Req() request: Request): Promise<unknown> {
+    const query = request.query as { provider?: string; snapshots?: string };
+    return this.hub.rpc(this.user(request).id, param(request), 'versions.list', {
+      provider: query.provider ?? '',
+      snapshots: query.snapshots === '1' || query.snapshots === 'true',
+    });
+  }
+
   @Post('servers/:id/version')
   version(@Req() request: Request): Promise<unknown> {
     return this.hub.rpc(this.user(request).id, param(request), 'version.change', request.body ?? {});

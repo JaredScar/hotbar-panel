@@ -68,7 +68,7 @@ The whole `server.properties` file, grouped and searchable. A save writes only t
 
 ### Files
 
-Folders and files for that server. Right-click a file, or use More, to rename, copy, or delete it. Text files open in the editor. Ctrl+S saves.
+Folders and files for that server. Right-click a file, or use More, to rename, copy, or delete it. Opening a text file leaves the list and fills the page. Ctrl+S saves.
 
 ![Files](docs/screenshots/files.png)
 
@@ -116,7 +116,7 @@ Operators, the whitelist, and bans, plus who is online when the server is runnin
 
 ### Version
 
-The installed server and Java version, and a change that backs up first.
+The installed server and Java version. Pick the next version from the list. A change writes a backup first.
 
 ![Version](docs/screenshots/version.png)
 

@@ -1,7 +1,7 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import type { ActivityEntry, AddonHit, BackupInfo, FileContent, FileEntry, ModpackHit, Reachability, ScheduleInfo, ServerView } from '@hotbar/shared';
+import { MC_PROVIDERS, type ActivityEntry, type AddonHit, type BackupInfo, type FileContent, type FileEntry, type McProviderId, type McVersion, type ModpackHit, type Reachability, type ScheduleInfo, type ServerView } from '@hotbar/shared';
 import { CodeEditor, languageLabel } from '../components/code-editor';
 import { PlayersPanel } from './players-panel';
 import { DownloadPrompt } from '../components/download-prompt';
@@ -49,6 +49,19 @@ export class ServerToolsPage {
   protected readonly nextVersion = signal('');
   protected readonly nextProvider = signal('paper');
   protected readonly installed = signal<{ provider: string; version: string; javaMajor: number } | null>(null);
+  protected readonly versionChoices = signal<McVersion[]>([]);
+  protected readonly versionQuery = signal('');
+  protected readonly snapshots = signal(false);
+  protected readonly loadingVersions = signal(false);
+  protected readonly versionError = signal<string | null>(null);
+  private versionTouched = false;
+  private versionLoad = 0;
+  protected readonly visibleVersions = computed(() => {
+    const query = this.versionQuery().trim().toLowerCase();
+    const list = this.versionChoices();
+    if (!query) return list;
+    return list.filter((item) => item.id.toLowerCase().includes(query));
+  });
   protected readonly sftp = signal<{ host: string; port: number; username: string; password: string } | null>(null);
   protected readonly reach = signal<Reachability | null>(null);
   protected readonly showSftp = signal(false);
@@ -118,7 +131,10 @@ export class ServerToolsPage {
         this.content.set(file);
         this.draft.set(file.text ?? '');
       } else if (this.tool() === 'version') {
-        this.installed.set(await this.data.currentInstall(id));
+        const install = await this.data.currentInstall(id);
+        this.installed.set(install);
+        if (install && !this.versionTouched && (MC_PROVIDERS as readonly string[]).includes(install.provider)) this.nextProvider.set(install.provider);
+        await this.loadVersionChoices();
       } else if (this.tool() === 'network') {
         this.sftp.set(await this.data.sftpInfo(id));
         this.reach.set(await this.data.reachability(id));
@@ -135,6 +151,10 @@ export class ServerToolsPage {
       }
       this.error.set(error instanceof Error ? error.message : 'Could not load this tab');
     }
+  }
+
+  protected editingFile(): boolean {
+    return this.tool() === 'files' && this.content() !== null;
   }
 
   protected dirty(): boolean {
@@ -507,9 +527,53 @@ export class ServerToolsPage {
     await this.load();
   }
 
+  protected chooseProvider(provider: string): void {
+    this.versionTouched = true;
+    this.nextProvider.set(provider);
+    this.nextVersion.set('');
+    void this.loadVersionChoices();
+  }
+
+  protected toggleSnapshots(): void {
+    this.snapshots.update((value) => !value);
+    void this.loadVersionChoices();
+  }
+
+  protected installedChoice(id: string): boolean {
+    const current = this.installed();
+    return current?.provider === this.nextProvider() && current.version === id;
+  }
+
+  protected async loadVersionChoices(): Promise<void> {
+    const provider = this.nextProvider();
+    if (!(MC_PROVIDERS as readonly string[]).includes(provider)) return;
+    const ticket = ++this.versionLoad;
+    this.loadingVersions.set(true);
+    this.versionError.set(null);
+    try {
+      const list = await this.data.listServerVersions(this.serverId(), provider as McProviderId, this.snapshots());
+      if (ticket !== this.versionLoad) return;
+      this.versionChoices.set(list);
+      if (list.some((item) => item.id === this.nextVersion())) return;
+      const installed = this.installed();
+      const current = installed?.provider === provider ? list.find((item) => item.id === installed.version) : undefined;
+      this.nextVersion.set(current?.id ?? list[0]?.id ?? '');
+    } catch (error) {
+      if (ticket !== this.versionLoad) return;
+      this.versionChoices.set([]);
+      this.versionError.set(error instanceof Error ? error.message : 'Could not load versions');
+    } finally {
+      if (ticket === this.versionLoad) this.loadingVersions.set(false);
+    }
+  }
+
   protected applyVersion(event: Event): void {
     event.preventDefault();
     const version = this.nextVersion().trim();
+    if (!version) {
+      this.error.set('Choose a version from the list.');
+      return;
+    }
     this.askDownload(
       [
         {

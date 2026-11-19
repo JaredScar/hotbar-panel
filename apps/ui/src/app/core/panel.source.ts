@@ -137,6 +137,10 @@ export class PanelDataSource extends DataSource {
     throw new Error('Create the server on the host.');
   }
 
+  override listServerVersions(id: string, provider: McProviderId, snapshots: boolean): Promise<McVersion[]> {
+    return this.session.request('GET', `/api/servers/${id}/versions?provider=${provider}&snapshots=${snapshots ? '1' : '0'}`);
+  }
+
   override async createMinecraft(_input: McCreateRequest): Promise<{ jobId: string }> {
     throw new Error('Create the server on the host.');
   }

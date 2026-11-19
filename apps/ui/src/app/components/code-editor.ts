@@ -16,10 +16,11 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView, keymap } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 
-const hotbarTheme = EditorView.theme(
+function hotbarTheme(fill: boolean): Extension {
+  return EditorView.theme(
   {
     '&': {
-      height: '24rem',
+      height: fill ? '100%' : '24rem',
       backgroundColor: '#1c232e',
       color: '#edf1f6',
     },
@@ -40,21 +41,36 @@ const hotbarTheme = EditorView.theme(
     '&.cm-focused': { outline: 'none' },
   },
   { dark: true },
-);
+  );
+}
 
 @Component({
   selector: 'app-code-editor',
-  template: `<div #host class="overflow-hidden rounded border border-line"></div>`,
+  template: `<div #host class="editor-host overflow-hidden rounded border border-line"></div>`,
   styles: `
     :host {
       display: block;
       min-width: 0;
     }
+    :host.fill {
+      display: flex;
+      min-height: 0;
+      flex: 1 1 auto;
+      flex-direction: column;
+    }
+    :host.fill .editor-host {
+      min-height: 0;
+      flex: 1 1 auto;
+    }
   `,
+  host: {
+    '[class.fill]': 'fill()',
+  },
 })
 export class CodeEditor implements OnDestroy {
   readonly value = input('');
   readonly filename = input('');
+  readonly fill = input(false);
   readonly changed = output<string>();
   readonly save = output<void>();
 
@@ -82,7 +98,7 @@ export class CodeEditor implements OnDestroy {
       extensions: [
         basicSetup,
         oneDark,
-        hotbarTheme,
+        hotbarTheme(this.fill()),
         EditorView.lineWrapping,
         EditorState.tabSize.of(2),
         this.languageSlot.of(languageFor(this.filename())),

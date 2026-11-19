@@ -77,6 +77,7 @@ export abstract class DataSource {
   abstract statsHistory(id: string): readonly ServerStats[];
   abstract attachLogs(id: string, onLine: (line: LogLine) => void): Promise<() => void>;
   abstract listMinecraftVersions(provider: McProviderId, snapshots: boolean): Promise<McVersion[]>;
+  abstract listServerVersions(id: string, provider: McProviderId, snapshots: boolean): Promise<McVersion[]>;
   abstract createMinecraft(input: McCreateRequest): Promise<{ jobId: string }>;
   abstract onInstall(listener: (event: InstallProgress) => void): () => void;
   abstract readProperties(id: string): Promise<ServerProperties>;

@@ -217,6 +217,10 @@ export class LocalAgentDataSource extends DataSource {
     return this.request<McVersion[]>('GET', `/api/minecraft/versions?provider=${provider}&snapshots=${snapshots ? '1' : '0'}`);
   }
 
+  override listServerVersions(_id: string, provider: McProviderId, snapshots: boolean): Promise<McVersion[]> {
+    return this.listMinecraftVersions(provider, snapshots);
+  }
+
   override async createMinecraft(input: McCreateRequest): Promise<{ jobId: string }> {
     return this.request<{ jobId: string }>('POST', '/api/minecraft', input);
   }

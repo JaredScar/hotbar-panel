@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { MC_PROVIDERS, type McProviderId } from '@hotbar/shared';
 import type { AgentConfig } from './config.js';
 import { createNamedDatabase, databasesFor, deleteNamedDatabase, revealDatabasePassword, rotateNamedDatabase } from './databases.js';
 import { acceptedDownloadIds, assertDownloadAccepted, databaseDownloadPlan } from './downloads.js';
@@ -10,6 +11,7 @@ import { HttpError } from './errors.js';
 import { listFiles, makeDirectory, readFileText, removePath, renamePath, saveUpload, writeFileText } from './files.js';
 import type { ServerManager } from './manager.js';
 import { createServerBackup, restoreServerBackup } from './minecraft/backup.js';
+import { listProviderVersions } from './minecraft/providers.js';
 import { actOnPlayer, collectPlayers } from './minecraft/players.js';
 import { addonDownloadOffer, installAddon, installModpack, searchAddons, searchModpacks } from './modrinth.js';
 
@@ -26,6 +28,11 @@ export async function runHostOp(
   const input = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
   const text = (key: string) => (typeof input[key] === 'string' ? (input[key] as string) : '');
   if (method === 'activity.list') return listActivity(db, 100);
+  if (method === 'versions.list') {
+    const provider = text('provider');
+    if (!(MC_PROVIDERS as readonly string[]).includes(provider)) throw new HttpError(400, 'choose a Minecraft server type');
+    return listProviderVersions(provider as McProviderId, input['snapshots'] === true);
+  }
   const server = manager.list().find((item) => item.id === serverId);
   if (!server) throw new HttpError(404, 'server not found');
   if (method === 'files.list') return listFiles(server.cwd, text('path'));
